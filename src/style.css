@@ -83,3 +83,61 @@ h3 { margin: 0 0 8px; font: 800 18px var(--display); color: var(--yellow); }
 canvas.minimap { position: static; inset: auto; width: 150px; height: 150px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); box-shadow: 0 6px 0 rgba(0, 0, 0, .3); background: #1a2030; }
 .br { position: absolute; right: 14px; bottom: 14px; }
 .btns { display: flex; gap: 8px; }
+
+/* ---------- v3: meters, news, damage ---------- */
+.meter { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; }
+.meter > span { width: 74px; opacity: .9; }
+.meter > div { flex: 1; height: 10px; border-radius: 8px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+.meter i { display: block; height: 100%; transition: width .2s; }
+.meter.hp i { background: linear-gradient(90deg, #ff4d5e, #ff9aa5); }
+.meter.mob i { background: linear-gradient(90deg, #ffb703, #ff6b00); }
+.meter.mob.hot { animation: pulse .5s infinite alternate; }
+.dmg { margin-top: 6px; font-size: 14px; } .dmg b { color: #ff9f1c; font: 800 17px var(--display); margin-left: 4px; }
+
+.news { position: absolute; top: 228px; left: 14px; width: min(400px, 40vw); padding: 10px 14px 12px; border-radius: 12px; background: rgba(13, 18, 36, .92); border: 2px solid #fff; border-left: 8px solid #e5192b; display: flex; flex-direction: column; gap: 3px; animation: slidein .35s ease-out; box-shadow: 0 6px 0 rgba(0, 0, 0, .3); }
+.news b { font: 800 19px/1.3 var(--bn); } .news span { font-size: 14px; opacity: .85; }
+.ntag { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 1px 10px; background: #e5192b; border-radius: 5px; font: 800 13px var(--display); letter-spacing: .04em; }
+.ntag i { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse .5s infinite alternate; }
+.news.big { top: 34%; left: 50%; width: min(560px, 90vw); transform: translateX(-50%); animation: bigpop .45s ease-out; border-left-width: 8px; }
+.news.big b { font-size: 26px; } .news.big span { font-size: 17px; }
+@keyframes slidein { from { transform: translateX(-30px); opacity: 0; } }
+@keyframes bigpop { from { transform: translateX(-50%) scale(.7); opacity: 0; } }
+
+/* ---------- v3: touch / phone ---------- */
+html, body { touch-action: none; overscroll-behavior: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.touchui { position: fixed; inset: 0; z-index: 6; pointer-events: none; touch-action: none; }
+.touchui .jzone { position: absolute; left: 0; bottom: 0; width: 46%; height: 72%; pointer-events: auto; touch-action: none; }
+.touchui .lzone { position: absolute; right: 0; top: 140px; width: 54%; bottom: 0; pointer-events: auto; touch-action: none; }
+.jbase { display: none; position: fixed; width: 110px; height: 110px; border-radius: 50%; background: rgba(255, 255, 255, .12); border: 3px solid rgba(255, 255, 255, .35); pointer-events: none; }
+.jthumb { position: absolute; left: 30px; top: 30px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, .55); }
+.tbtns { position: absolute; right: 18px; bottom: 16px; width: 210px; height: 170px; pointer-events: none; }
+.tb { position: absolute; width: 66px; height: 66px; border-radius: 50%; font: 800 26px var(--display); background: rgba(13, 18, 36, .72); border: 3px solid rgba(255, 255, 255, .45); color: #fff; pointer-events: auto; touch-action: none; user-select: none; display: grid; place-items: center; padding: 0; }
+.tb:active { transform: scale(.92); background: rgba(255, 210, 63, .5); }
+.tb.pnch { right: 0; bottom: 0; width: 86px; height: 86px; font-size: 38px; background: rgba(244, 42, 65, .6); border-color: #fff; }
+.tb.jmp { right: 96px; bottom: 6px; }
+.tb.run { right: 108px; bottom: 82px; width: 56px; height: 56px; font-size: 22px; }
+.tb.act { right: 10px; bottom: 98px; width: 60px; height: 60px; font-size: 22px; }
+.tb.act.hot { background: var(--yellow); color: #111; animation: pulse .6s infinite alternate; }
+.rotate { display: none; position: fixed; inset: 0; z-index: 60; background: #0d1224; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; font: 800 26px var(--display); }
+.rotate div { font-size: 70px; } .rotate p { margin: 0; }
+@media (orientation: portrait) { body.touch .rotate { display: flex; } }
+
+body.touch .bl, body.touch .compass, body.touch .pausebtn.mute { display: none; }
+body.touch .br { top: auto; bottom: 14px; left: 14px; right: auto; }
+body.touch canvas.minimap { width: 100px !important; height: 100px !important; }
+body.touch .tl { min-width: 0; padding: 6px 10px; }
+body.touch .xpbar { width: 90px; } body.touch .meter > span { width: 60px; font-size: 11px; } body.touch .badge { width: 36px; height: 36px; font-size: 20px; }
+body.touch .mission { min-width: 0; max-width: 40vw; padding: 6px 10px; } body.touch .obj { font-size: 14px; } body.touch .timer { font-size: 26px; }
+body.touch .news { top: 120px; left: 50%; transform: translateX(-50%); width: min(420px, 56vw); animation: none; } body.touch .news b { font-size: 15px; } body.touch .news span { display: none; }
+body.touch .news.big { top: 28%; } body.touch .news.big b { font-size: 20px; }
+body.touch .bc { bottom: 110px; } body.touch .toast { font-size: 14px; padding: 6px 12px; } body.touch .prompt { font-size: 16px; padding: 6px 14px; }
+body.touch .wanted span { font-size: 18px; } body.touch .tr { gap: 6px; } body.touch .pausebtn { padding: 6px 12px; font-size: 14px; }
+
+@media (max-height: 560px) {
+  .screen.menu { gap: 12px; overflow-y: auto; justify-content: flex-start; padding: 12px; }
+  .screen.menu .panels { display: none; }
+  h1 { font-size: clamp(44px, min(12vw, 24vh), 150px); }
+  button.big { margin-top: 8px; padding: 10px 24px; font-size: 20px; }
+  .card { padding: 14px 22px; } .card h2 { font-size: 36px; } .card .controls { display: none; }
+}
+@media (max-width: 700px) { .panels .panel { min-width: 220px; } .news { width: min(400px, 60vw); } }

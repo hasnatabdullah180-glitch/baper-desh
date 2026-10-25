@@ -4,6 +4,7 @@ import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { G } from './sim'
 import { hud, bn } from './store'
+import { SPH, mat } from './gfx.jsx'
 import { camBlocked } from './world'
 import { Person, RickshawBody } from './Traffic.jsx'
 
@@ -47,19 +48,27 @@ function Hero() {
   return <group ref={root}><group rotation={[0, Math.PI, 0]}><primitive object={scene} scale={k} /></group></group>
 }
 
+const fistM = mat('#e0a070', { emissive: '#ff9f1c', emissiveIntensity: 0.6 })
 export function Player() {
-  const g = useRef(), r = useRef(), c = useRef()
+  const g = useRef(), r = useRef(), c = useRef(), fist = useRef(), side = useRef(0.22), prev = useRef(0)
   useFrame((s) => {
     const rk = G.mode === 'rick'
     g.current.position.set(G.x, G.y, G.z)
     g.current.rotation.y = G.face
     g.current.rotation.z = rk ? Math.sin(s.clock.elapsedTime * 7) * 0.03 * Math.min(1, G.spd / 5) : 0
     r.current.visible = rk
-    c.current.position.set(0, rk ? 0.5 : 0, rk ? 0.55 : 0)
-    c.current.rotation.x = G.grounded ? 0 : -0.22
+    const pt = G.punchT, lunge = pt > 0 ? Math.sin((1 - pt / 0.28) * Math.PI) : 0
+    if (pt > prev.current) side.current = -side.current
+    prev.current = pt
+    c.current.position.set(0, rk ? 0.5 : 0, (rk ? 0.55 : 0) + lunge * 0.35)
+    c.current.rotation.x = (G.grounded ? 0 : -0.22) + lunge * 0.5
+    fist.current.visible = pt > 0 && !rk
+    fist.current.position.set(side.current, 1.25, 0.5 + lunge * 0.9)
+    fist.current.scale.setScalar(0.15 + lunge * 0.1)
   })
   return (
     <group ref={g}>
+      <mesh ref={fist} geometry={SPH} material={fistM} visible={false} />
       <group ref={r} visible={false}><RickshawBody color="#e63946" /></group>
       <group ref={c}>
         <ModelBoundary fallback={<Person c="#2a9d8f" />}>

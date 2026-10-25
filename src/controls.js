@@ -11,7 +11,18 @@ export function lock() {
     p?.catch?.(() => { G.noLock = true })
   } catch { G.noLock = true }
 }
-export function startGame() { resetGame(); initAudio(); setActive(true); hud.set({ phase: 'play' }); lock() }
+export function setTouch() {
+  if (hud.get().touch) return
+  G.noLock = true
+  document.body.classList.add('touch')
+  hud.set({ touch: true })
+}
+function goFullscreen() {
+  if (!hud.get().touch) return
+  try { document.documentElement.requestFullscreen?.()?.catch?.(() => {}) } catch { /* ignore */ }
+  try { screen.orientation?.lock?.('landscape')?.catch?.(() => {}) } catch { /* ignore */ }
+}
+export function startGame() { resetGame(); initAudio(); setActive(true); goFullscreen(); hud.set({ phase: 'play' }); lock() }
 export function pauseGame() { if (hud.get().phase !== 'play') return; hud.set({ phase: 'pause' }); setActive(false); document.exitPointerLock?.() }
 export function resumeGame() { initAudio(); setActive(true); hud.set({ phase: 'play' }); lock() }
 export function toMenu() { resetGame(); setActive(false); siren(false); hud.set({ phase: 'menu' }); document.exitPointerLock?.() }
@@ -28,6 +39,7 @@ export function useInput() {
       if (st.phase === 'play' && !st.result) {
         if (e.code === 'Space') G.jump = true
         if (e.code === 'KeyE') G.interact = true
+        if (e.code === 'KeyF') G.punch = true
         if (e.code === 'KeyP') pauseGame()
       } else if (e.code === 'KeyP' && st.phase === 'pause') resumeGame()
       if (e.code === 'Enter' && st.result) dismissResult()
@@ -42,6 +54,8 @@ export function useInput() {
     }
     const md = (e) => {
       const st = hud.get()
+      if (st.touch) return
+      if (st.phase === 'play' && !st.result && e.button === 0 && document.pointerLockElement) { G.punch = true; return }
       if (st.phase === 'play' && !st.result && !document.pointerLockElement && !G.noLock && e.target.tagName === 'CANVAS' && !e.target.classList.contains('minimap')) lock()
     }
     const plc = () => {
@@ -50,6 +64,9 @@ export function useInput() {
     }
     const plerr = () => { G.noLock = true }
     const blur = () => { G.keys = {}; pauseGame() }
+    if (window.matchMedia?.('(pointer: coarse)').matches) setTouch()
+    const ts = () => setTouch()
+    window.addEventListener('touchstart', ts, { once: true, passive: true })
     window.addEventListener('keydown', kd)
     window.addEventListener('keyup', ku)
     window.addEventListener('mousemove', mm)
@@ -58,6 +75,7 @@ export function useInput() {
     document.addEventListener('pointerlockchange', plc)
     document.addEventListener('pointerlockerror', plerr)
     return () => {
+      window.removeEventListener('touchstart', ts)
       window.removeEventListener('keydown', kd)
       window.removeEventListener('keyup', ku)
       window.removeEventListener('mousemove', mm)

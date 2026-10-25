@@ -29,6 +29,7 @@ export const PADS = [
   { id: 'boss', x: 27, z: 40, color: '#f42a41', label: 'ট্রাফিক বস' },
   { id: 'race', x: 53, z: 40, color: '#ffb703', label: 'রিকশা রেসার' },
   { id: 'chase', x: 40, z: 58, color: '#3a86ff', label: 'পুলিশ চেজ' },
+  { id: 'cng', x: 40, z: 22, color: '#ff7b00', label: 'অটো ধর' },
 ]
 export const FLAG = { x: 40, z: 40 }
 

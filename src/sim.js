@@ -1,6 +1,6 @@
-import { hud, toast, addXp, addChaos, recordBest, bn } from './store'
-import { ROADS, BX, resolve, gY, PADS } from './world'
-import { sfx, siren } from './audio'
+import { hud, toast, addXp, addChaos, addDamage, news, recordBest, saveNow, bn } from './store'
+import { ROADS, BX, resolve, gY, PADS, lamps, trees } from './world'
+import { sfx, siren, say, crowdLoop } from './audio'
 
 const rnd = (a, b) => a + Math.random() * (b - a)
 const pick = (a) => a[Math.floor(Math.random() * a.length)]
@@ -12,12 +12,14 @@ export const G = {
   stun: 0, mode: 'foot', t: 0, heat: 0, wantedShown: 0,
   mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null,
   vehicles: [], npcs: [], cdNpc: 0,
+  hp: 100, mob: 0, crowd: [], crowdCd: 0, crowdAge: 0, crowdHit: 0, lastHurt: 0, punch: false, punchCd: 0, punchT: 0, joy: { x: 0, y: 0 }, fx: [], cng: null,
 }
 
 export const MISSIONS = {
   boss: { title: 'ট্রাফিক বস', time: 70, intro: 'সব চেকপয়েন্টে সময়মতো পৌঁছাও — রাস্তা এখন তোমার!' },
   race: { title: 'রিকশা রেসার', time: 60, intro: 'রিকশা নিয়ে সবাইকে হারিয়ে দাও!' },
   chase: { title: 'পুলিশ চেজ', time: 70, intro: 'পুলিশ মামা পিছনে! গোপন আড্ডায় পৌঁছাও!' },
+  cng: { title: 'অটো ধর', time: 100, intro: 'ভাড়া নিয়ে ঝগড়া! বদমেজাজি অটোওয়ালা পালাচ্ছে — দৌড়ে ধরে ঘুষি মেরে থামাও!' },
 }
 const BOSS = [[0, 40], [0, -40], [-40, 0], [-80, 40], [-40, 80], [40, 80]]
 const RACE = [[80, 0], [80, 80], [0, 80], [0, 0], [80, 0], [80, 40]]
@@ -81,9 +83,9 @@ initWorld()
 
 // ---------- game flow ----------
 export function resetGame() {
-  Object.assign(G, { x: 40, y: 0.12, z: 46, vx: 0, vz: 0, vy: 0, grounded: true, face: Math.PI, spd: 0, yaw: 0, pitch: 0.38, stun: 0, mode: 'foot', heat: 0, wantedShown: 0, mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null })
-  siren(false)
-  hud.set({ wanted: 0, mission: null, obj: '', left: 0, prompt: '', result: null, toasts: [] })
+  Object.assign(G, { x: 40, y: 0.12, z: 46, vx: 0, vz: 0, vy: 0, grounded: true, face: Math.PI, spd: 0, yaw: 0, pitch: 0.38, stun: 0, mode: 'foot', heat: 0, wantedShown: 0, mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null, hp: 100, mob: 0, crowd: [], crowdCd: 0, cng: null, punchT: 0, fx: [] })
+  siren(false); crowdLoop(false)
+  hud.set({ hp: 100, mob: 0, news: null, wanted: 0, mission: null, obj: '', left: 0, prompt: '', result: null, toasts: [] })
 }
 
 export function startMission(id) {
@@ -96,6 +98,11 @@ export function startMission(id) {
     G.x = 34; G.z = 0; G.face = Math.PI / 2; G.yaw = -Math.PI / 2; G.y = 0
     G.mission.cd = 3.2
     G.rivals = [-4, 4].map((z, k) => ({ x: 34, z, ry: Math.PI / 2, idx: 0, speed: 9.2 + k * 1.1, done: false, color: k ? '#06d6a0' : '#8338ec' }))
+  }
+  if (id === 'cng') {
+    G.cng = { x: 0, z: 0, ry: 0, from: [0, 0], to: [0, 0], hp: 6, halt: 0, speed: 7.2 }
+    G.cng.to = nextNode(G.cng); G.cps = [[0, 0]]
+    toast('অটোওয়ালা: “মিটারে যামু না!” বলে পালাইছে!', 'mission')
   }
   if (id === 'chase') {
     G.cps = [HIDE]; G.heat = 3; siren(true)
@@ -110,7 +117,7 @@ function end(ok, msg, xp, chaos) {
   siren(false); sfx(ok ? 'win' : 'fail')
   if (ok) { addXp(xp); if (chaos) addChaos(chaos); recordBest(m.id, m.t) } else addXp(10)
   hud.set({ result: { ok, id: m.id, title: MISSIONS[m.id].title, msg, xp: ok ? Math.round(xp) : 10, chaos: ok ? chaos : 0, time: m.t }, mission: null, left: 0, obj: '', wanted: 0, prompt: '' })
-  Object.assign(G, { mission: null, cps: [], cops: [], rivals: [], mode: 'foot', heat: 0, wantedShown: 0, stun: 0, target: null })
+  Object.assign(G, { mission: null, cps: [], cops: [], rivals: [], cng: null, mode: 'foot', heat: 0, wantedShown: 0, stun: 0, target: null })
   G.noPauseUntil = performance.now() + 500 // ignore the unlock event this triggers
   document.exitPointerLock?.()
 }
@@ -123,12 +130,13 @@ export function step(dt) {
   if (st.phase !== 'play' || st.result) return
   dt = Math.min(dt, 0.05)
   G.t += dt
-  vehicles(dt); npcs(dt); player(dt); mission(dt); wanted(dt)
-  G.jump = false; G.interact = false
+  vehicles(dt); npcs(dt); player(dt); crowd(dt); mission(dt); wanted(dt); syncMeters()
+  G.jump = false; G.interact = false; G.punch = false
 }
 
 function vehicles(dt) {
   for (const v of G.vehicles) {
+    if (v.halt > 0) { v.halt -= dt; v.cd -= dt; continue } // punched: stuck in a jam
     v.s += v.dir * v.speed * dt
     if (v.s > 170) v.s -= 340
     else if (v.s < -170) v.s += 340
@@ -140,8 +148,9 @@ function vehicles(dt) {
 function npcs(dt) {
   G.cdNpc -= dt
   for (const p of G.npcs) {
-    const sp = p.speed * (p.scare > 0 ? 3 : 1)
     p.scare -= dt
+    if (p.down > 0) { p.down -= dt; continue } // knocked flat
+    const sp = p.speed * (p.scare > 0 ? 3 : 1)
     p.a += p.dir * sp * dt
     if (p.a > p.a1) { p.a = p.a1; p.dir = -1 } else if (p.a < p.a0) { p.a = p.a0; p.dir = 1 }
     placeNpc(p)
@@ -155,13 +164,15 @@ function player(dt) {
   const rick = G.mode === 'rick'
   let ix = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0)
   let iz = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0)
+  const jx = Math.abs(G.joy.x) > 0.15 ? G.joy.x : 0, jy = Math.abs(G.joy.y) > 0.15 ? G.joy.y : 0
+  ix = Math.max(-1, Math.min(1, ix + jx)); iz = Math.max(-1, Math.min(1, iz + jy))
   if (G.stun > 0) { G.stun -= dt; ix = iz = 0 }
   if (G.mission && G.mission.cd > 0) ix = iz = 0
   const s = Math.sin(G.yaw), c = Math.cos(G.yaw)
   let dx = ix * c - iz * s, dz = -ix * s - iz * c
   const len = Math.hypot(dx, dz), moving = len > 0.01
   if (moving) { dx /= len; dz /= len }
-  const sprint = k.ShiftLeft || k.ShiftRight
+  const sprint = k.ShiftLeft || k.ShiftRight || Math.hypot(jx, jy) > 0.9
   const maxV = rick ? 12.5 : sprint ? 8.8 : 4.2
   const acc = 1 - Math.exp(-(rick ? 2.2 : 10) * dt)
   G.vx += ((moving ? dx * maxV : 0) - G.vx) * acc
@@ -185,10 +196,17 @@ function player(dt) {
       }
     } else if (v.cd <= 0 && G.spd > 2.5) {
       const ox = Math.max(Math.abs(ddx) - v.hx, 0), oz = Math.max(Math.abs(ddz) - v.hz, 0)
-      if (Math.hypot(ox, oz) < pr + 0.8) { v.cd = 2.5; sfx('horn'); addChaos(20, pick(['বাপরে বাপ! অল্পের জন্য বাঁচলাম!', 'নিয়ার মিস! কলিজা ঠান্ডা!', 'ঢাকার রাস্তায় এটাই নিয়ম!'])) }
+      if (Math.hypot(ox, oz) < pr + 0.8) { v.cd = 2.5; sfx(v.type === 'rick' ? 'bell' : v.type === 'bus' ? 'horn' : 'honk'); addChaos(20, pick(['বাপরে বাপ! অল্পের জন্য বাঁচলাম!', 'নিয়ার মিস! কলিজা ঠান্ডা!', 'ঢাকার রাস্তায় এটাই নিয়ম!'])) }
     }
   }
+  if (G.cng) {
+    const dx = G.x - G.cng.x, dz = G.z - G.cng.z, d = Math.hypot(dx, dz), mn = 1.4 + pr
+    if (d < mn && d > 0.01) { G.x += (dx / d) * (mn - d); G.z += (dz / d) * (mn - d) }
+  }
   resolve(G, pr)
+
+  G.punchCd -= dt; G.punchT = Math.max(0, G.punchT - dt)
+  if (G.punch && !rick && G.punchCd <= 0 && G.stun <= 0 && !(G.mission && G.mission.cd > 0)) doPunch()
 
   if (G.jump && G.grounded && !rick && G.stun <= 0) { G.vy = 7.8; G.grounded = false; sfx('jump') }
   G.vy -= 24 * dt; G.y += G.vy * dt
@@ -259,6 +277,9 @@ function mission(dt) {
     const dp = Math.hypot(G.x - tgt[0], G.z - tgt[1])
     const ahead = G.rivals.filter((r) => r.idx > G.cpi || (r.idx === G.cpi && Math.hypot(r.x - tgt[0], r.z - tgt[1]) < dp)).length
     obj = `চেকপয়েন্ট ${bn(Math.min(G.cpi + 1, G.cps.length))}/${bn(G.cps.length)} · অবস্থান ${bn(ahead + 1)}/${bn(3)}`
+  } else if (m.id === 'cng') {
+    obj = `অটো ধরো! আর ${bn(G.cng.hp)}টি ঘুষি বাকি`
+    cngStep(dt)
   } else if (m.id === 'chase') {
     G.heat = Math.max(G.heat, 3)
     obj = 'পুলিশ থেকে পালিয়ে গোপন আড্ডায় পৌঁছাও!'
@@ -268,7 +289,7 @@ function mission(dt) {
   }
   if (obj !== hud.get().obj) hud.set({ obj })
   if (m.left <= 0) {
-    const msgs = { boss: 'সময় শেষ! জ্যামে আটকাইলা নাকি?', race: 'রিকশা পিছনে পইড়া গেল! সময় শেষ!', chase: 'সময় শেষ! পুলিশ মামারা আড্ডায় ঘেরাও করছে!' }
+    const msgs = { boss: 'সময় শেষ! জ্যামে আটকাইলা নাকি?', race: 'রিকশা পিছনে পইড়া গেল! সময় শেষ!', chase: 'সময় শেষ! পুলিশ মামারা আড্ডায় ঘেরাও করছে!', cng: 'অটো পালাইছে! এখন মিটারের ভাড়াই দিতে হবে!' }
     end(false, msgs[m.id], 0, 0)
   }
 }
@@ -309,8 +330,159 @@ function wanted(dt) {
   if (!G.mission || G.mission.id !== 'chase') G.heat = Math.max(0, G.heat - 0.1 * dt)
   const w = Math.min(5, Math.floor(G.heat))
   if (w !== G.wantedShown) {
+    if (w === 5 && G.wantedShown < 5) news('ব্রেকিং: দেশজুড়ে হাই-অ্যালার্ট!', 'পুলিশ খুঁজছে রাস্তার তাণ্ডবকারী যুবককে', true)
     if (w > G.wantedShown) toast(`ওয়ান্টেড লেভেল ${bn(w)} ★ পুলিশ মামা নজর রাখছে!`, 'bad')
     G.wantedShown = w; hud.set({ wanted: w })
     if (w >= 4 && !G.mission) { G.mode = 'foot'; startMission('chase') }
   }
+}
+
+// ================= punching, damage, mob, CNG =================
+const rint = (a, b) => Math.floor(rnd(a, b))
+const POW = ['ধুম!', 'ঠাস!', 'দড়াম!', 'ধপাস!', 'ফটাস!', 'বুম!']
+const fx = (text, x, y, z, color = '#ffd23f') => { G.fx.push({ text, x, y, z, color }); if (G.fx.length > 8) G.fx.shift() }
+const CNG_LINES = ['আরে ভাই মারেন কেন!', 'মিটারে গেলে লস হয় ভাই!', 'ভাড়া তো ৫০০ই ঠিক ছিল!', 'পুলিশ ডাকমু কিন্তু!', 'ওরে বাবা আমার CNG!']
+const JAM_LINES = ['জ্যাম! সবাই হর্ন বাজাচ্ছে!', 'গাড়ি আটকে গেল! ঢাকার জ্যাম!', 'ড্রাইভার চিৎকার করছে!']
+
+function doPunch() {
+  G.punchCd = 0.42; G.punchT = 0.28
+  // find the nearest thing in reach (auto-aim, so it works from any direction — great on touch)
+  let best = null, bd = 1e9
+  const cand = (d, kind, ref, lim) => { if (d < lim && d < bd) { bd = d; best = { kind, ref } } }
+  if (G.cng) cand(Math.hypot(G.cng.x - G.x, G.cng.z - G.z) - 1.3, 'cng', G.cng, 2.0)
+  for (const c of G.crowd) if (c.down <= 0) cand(Math.hypot(c.x - G.x, c.z - G.z), 'mob', c, 2.1)
+  for (const p of G.npcs) if (!(p.down > 0.3)) cand(Math.hypot(p.x - G.x, p.z - G.z), 'npc', p, 2.1)
+  for (const v of G.vehicles) {
+    const ox = Math.max(Math.abs(G.x - v.x) - v.hx, 0), oz = Math.max(Math.abs(G.z - v.z) - v.hz, 0)
+    cand(Math.hypot(ox, oz), 'veh', v, 1.5)
+  }
+  for (const l of lamps) cand(Math.hypot(l.x - G.x, l.z - G.z) - 0.3, 'lamp', l, 1.6)
+  for (const t of trees) cand(Math.hypot(t.x - G.x, t.z - G.z) - 0.5, 'tree', t, 1.6)
+  if (!best) { sfx('whoosh'); return }
+
+  const r = best.ref, tx = r.x, tz = r.z
+  G.face = Math.atan2(tx - G.x, tz - G.z)
+  const k = best.kind
+  if (k === 'npc') {
+    r.down = 1.6; r.scare = 4
+    fx(pick(POW), tx, 1.9, tz)
+    sfx('punch'); setTimeout(() => sfx(Math.random() < 0.5 ? 'ouch' : 'scream'), 90)
+    addDamage(rint(500, 2500)); addChaos(12, Math.random() < 0.45 ? pick(NPC_LINES) : '')
+    say(pick(NPC_LINES))
+    G.mob += 22; addHeat(0.5)
+    for (const o of G.npcs) if (o !== r && Math.hypot(o.x - tx, o.z - tz) < 10) { o.scare = 3; G.mob += 3 } // witnesses panic
+  } else if (k === 'mob') {
+    r.down = 1.8
+    fx(pick(POW), tx, 1.9, tz, '#ff7b7b'); sfx('punch'); setTimeout(() => sfx('ouch'), 90)
+    addChaos(10)
+  } else if (k === 'veh') {
+    r.halt = 2.5
+    const [a, b] = r.type === 'bus' ? [60000, 120000] : r.type === 'car' ? [25000, 60000] : [6000, 15000]
+    fx(pick(['ঠং!', 'দড়াম!', 'ক্যাঁচ!']), tx, 2.4, tz); sfx('punch'); setTimeout(() => sfx(r.type === 'rick' ? 'bell' : 'honk'), 120)
+    addDamage(rint(a, b)); addChaos(25, Math.random() < 0.5 ? pick(JAM_LINES) : '')
+    G.mob += 12; addHeat(0.45)
+  } else if (k === 'lamp') {
+    fx('ঠং!', tx, 4, tz, '#9ad1ff'); sfx('clang'); addDamage(3000); addChaos(5); G.mob += 3
+  } else if (k === 'tree') {
+    fx('ফটাস!', tx, 3.2, tz, '#7ef2a0'); sfx('slap'); addDamage(800); addChaos(3); G.mob += 1
+  } else if (k === 'cng') {
+    r.hp--; r.halt = 0.9; r.speed = Math.max(4.2, r.speed - 0.5)
+    fx(pick(POW), tx, 2.6, tz, '#ff9f1c'); sfx('punch'); setTimeout(() => sfx('clang'), 70)
+    addDamage(rint(4000, 12000)); addChaos(20); toast(pick(CNG_LINES), 'chaos'); say(pick(CNG_LINES))
+    if (r.hp <= 0) {
+      sfx('crash')
+      news('অটোওয়ালা ধরা!', 'যাত্রী বললেন: “ভাড়া কিন্তু মিটারে!”', true)
+      end(true, 'অটো ধরা পড়ছে! ভাড়া এখন মিটারে!', 280 + Math.max(0, G.mission.left) * 2, 150)
+    }
+  }
+}
+
+// ---- runaway CNG auto-rickshaw: flees along the 3x3 road grid, away from the player ----
+function nextNode(c) {
+  const [fx0, fz0] = c.to
+  let opts = [[80, 0], [-80, 0], [0, 80], [0, -80]].map(([dx, dz]) => [fx0 + dx, fz0 + dz]).filter(([x, z]) => Math.abs(x) <= 80 && Math.abs(z) <= 80)
+  const back = opts.filter(([x, z]) => !(x === c.from[0] && z === c.from[1]))
+  if (back.length) opts = back
+  let bestN = opts[0], bs = -1
+  for (const o of opts) { const sc = Math.hypot(o[0] - G.x, o[1] - G.z) + rnd(0, 45); if (sc > bs) { bs = sc; bestN = o } }
+  return bestN
+}
+function cngStep(dt) {
+  const c = G.cng
+  if (!c) return
+  if (c.halt > 0) c.halt -= dt
+  else {
+    const dx = c.to[0] - c.x, dz = c.to[1] - c.z, d = Math.hypot(dx, dz)
+    if (d < 1.6) { c.from = c.to; c.to = nextNode(c) }
+    else {
+      const turn = Math.abs(((Math.atan2(dx, dz) - c.ry + Math.PI * 3) % (Math.PI * 2)) - Math.PI) // slow down while turning
+      const sp = c.speed * (turn > 0.5 ? 0.6 : 1)
+      c.x += (dx / d) * sp * dt; c.z += (dz / d) * sp * dt
+      c.ry = angLerp(c.ry, Math.atan2(dx, dz), 1 - Math.exp(-5 * dt))
+    }
+  }
+  G.cps[0][0] = c.x; G.cps[0][1] = c.z
+}
+
+// ---- angry public ----
+function crowd(dt) {
+  G.crowdCd -= dt
+  const n = G.crowd.length
+  G.mob = Math.max(0, Math.min(100, G.mob) - (n ? 0.6 : 2.2) * dt)
+  if (!n && G.mob >= 70 && G.crowdCd <= 0 && G.mission?.id !== 'race') spawnCrowd()
+  crowdLoop(G.crowd.length > 0)
+  if (!n) {
+    if (G.t - G.lastHurt > 6 && G.hp < 100) G.hp = Math.min(100, G.hp + 5 * dt)
+    return
+  }
+  G.crowdAge += dt; G.crowdHit -= dt
+  let allFar = true
+  for (const c of G.crowd) {
+    if (c.down > 0) { c.down -= dt; continue }
+    const dx = G.x - c.x, dz = G.z - c.z, d = Math.hypot(dx, dz)
+    if (d < 50) allFar = false
+    const ox = c.x, oz = c.z
+    if (d > 1.1) { c.x += (dx / d) * c.sp * dt; c.z += (dz / d) * c.sp * dt }
+    for (const o of G.crowd) if (o !== c) { const ex = c.x - o.x, ez = c.z - o.z, ed = Math.hypot(ex, ez); if (ed < 1.1 && ed > 0.01) { c.x += (ex / ed) * (1.1 - ed) * 0.5; c.z += (ez / ed) * (1.1 - ed) * 0.5 } }
+    resolve(c, 0.5)
+    c.moving = Math.hypot(c.x - ox, c.z - oz) > 0.01
+    c.ry = angLerp(c.ry, Math.atan2(dx, dz), 1 - Math.exp(-10 * dt))
+    if (d < 1.5 && G.crowdHit <= 0 && G.stun <= 0.15) {
+      G.crowdHit = 0.55; G.hp -= 6; G.stun = 0.25; G.lastHurt = G.t
+      G.vx = (dx / (d || 1)) * 6; G.vz = (dz / (d || 1)) * 6
+      sfx('slap'); sfx('ouch'); fx(pick(POW), G.x, 2, G.z, '#ff7b7b')
+      if (!G.crowdHint) { G.crowdHint = true; toast('গণধোলাই চলছে! দৌড়াও বা ঘুষি মারো!', 'bad') }
+      if (G.hp <= 0) return beaten()
+    }
+  }
+  if (G.crowdAge > 45 || allFar) {
+    G.crowd = []; G.mob = 15; G.crowdCd = 10
+    addChaos(60, 'জনতার হাত থেকে পালিয়েছো!')
+    news('জনতার হাত থেকে পালালো সেই যুবক', 'এলাকায় থমথমে অবস্থা, খুঁজছে পুলিশ')
+  }
+}
+function spawnCrowd() {
+  const cnt = G.mission ? 4 : 5
+  G.crowd = []
+  for (let i = 0; i < cnt; i++) {
+    const a = rnd(0, Math.PI * 2), r = rnd(22, 30)
+    const c = { x: G.x + Math.cos(a) * r, z: G.z + Math.sin(a) * r, ry: 0, sp: rnd(5.0, 6.2), down: 0, moving: true }
+    resolve(c, 0.6); G.crowd.push(c)
+  }
+  G.crowdAge = 0; G.crowdHint = false
+  sfx('whistle'); toast('জনতা তেড়ে আসছে! দৌড়াও!', 'bad')
+  news('ব্রেকিং নিউজ: তাণ্ডবে ক্ষুব্ধ জনতা!', 'এলাকাবাসী ঘিরে ধরছে অজ্ঞাতনামা এক যুবককে')
+}
+function beaten() {
+  const had = !!G.mission
+  news('গণপিটুনির শিকার তাণ্ডবকারী!', 'এলাকাবাসী: “বাপের দেশে এইসব চলবে না!”', true)
+  sfx('fail')
+  hud.set({ chaos: Math.max(0, hud.get().chaos - 50), wanted: 0 }); saveNow()
+  if (had) end(false, 'গণধোলাই খাইলা! মিশন শেষ!', 0, 0)
+  Object.assign(G, { x: 40, z: 46, y: 0.12, vx: 0, vz: 0, hp: 100, mob: 0, crowd: [], crowdCd: 12, stun: 1.5, heat: 0, wantedShown: 0 })
+  toast('হাসপাতাল থেকে ফিরলে… চাওস −৫০', 'bad')
+}
+function syncMeters() {
+  const hp = Math.round(G.hp), mb = Math.round(Math.min(100, G.mob)), h = hud.get()
+  if (hp !== h.hp || mb !== h.mob) hud.set({ hp, mob: mb })
 }

@@ -2,9 +2,10 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { BOX, CYL, PLANE, mat, labelTex } from './gfx.jsx'
-import { CarBody, RickshawBody, Person } from './Traffic.jsx'
+import { CarBody, RickshawBody, CngBody, Person } from './Traffic.jsx'
 import { G, HIDEOUT } from './sim'
 import { PADS } from './world'
+import { hud } from './store'
 
 const OPEN = new THREE.CylinderGeometry(1, 1, 1, 24, 1, true)
 const glow = (c, o = 0.3) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
@@ -28,7 +29,7 @@ function Pad({ p }) {
   )
 }
 
-const BC = { boss: ['#f42a41', 5], race: ['#ffb703', 9], chase: ['#06d6a0', 5] }
+const BC = { boss: ['#f42a41', 5], race: ['#ffb703', 9], chase: ['#06d6a0', 5], cng: ['#ff7b00', 3.2] }
 const ringMats = {}, beamMats = {}
 const gm = (cache, c, o) => (cache[c + o] ||= glow(c, o))
 
@@ -116,11 +117,77 @@ function Rivals() {
   ))
 }
 
+// runaway CNG auto-rickshaw with a little health bar
+function Cng() {
+  const g = useRef(), bar = useRef()
+  useFrame((s) => {
+    const c = G.cng
+    g.current.visible = !!c
+    if (!c) return
+    const sh = c.halt > 0 ? Math.sin(s.clock.elapsedTime * 60) * 0.06 : 0
+    g.current.position.set(c.x + sh, 0.05, c.z); g.current.rotation.y = c.ry
+    bar.current.scale.x = Math.max(0.01, 2.0 * (c.hp / 6))
+  })
+  return (
+    <group ref={g} visible={false}>
+      <CngBody />
+      <sprite position={[0, 3.1, 0]} scale={[2.2, 0.3, 1]}><spriteMaterial color="#10131f" toneMapped={false} depthTest={false} /></sprite>
+      <sprite ref={bar} position={[0, 3.1, 0]} scale={[2, 0.2, 1]}><spriteMaterial color="#ff3b4d" toneMapped={false} depthTest={false} /></sprite>
+    </group>
+  )
+}
+
+// angry public chasing the player
+function Crowd() {
+  const refs = useRef([]), limbs = useRef([0, 1, 2, 3, 4, 5].map(() => ({ current: {} })))
+  useFrame((s) => {
+    const t = s.clock.elapsedTime
+    refs.current.forEach((o, i) => {
+      const c = G.crowd[i]
+      o.visible = !!c
+      if (!c) return
+      const dn = c.down > 0
+      o.rotation.order = 'YXZ'
+      o.position.set(c.x, dn ? 0.3 : 0.12, c.z); o.rotation.y = c.ry; o.rotation.x = dn ? -1.45 : 0
+      const l = limbs.current[i].current, sw = dn ? 0 : Math.sin(t * 13 + i) * 0.9
+      if (l.l) { l.l.rotation.x = sw; l.r.rotation.x = -sw; l.al.rotation.x = Math.PI - 0.4 + sw * 0.3; l.ar.rotation.x = Math.PI - 0.4 - sw * 0.3 } // fists up
+    })
+  })
+  return [0, 1, 2, 3, 4, 5].map((i) => (
+    <group key={i} ref={(e) => (refs.current[i] = e)} visible={false} scale={1.05}><Person c="#d62828" limbs={limbs.current[i]} /></group>
+  ))
+}
+
+// floating comic text: ধুম! ঠাস! ...
+function Fx() {
+  const slots = useRef([])
+  useFrame((_, dt) => {
+    if (hud.get().phase === 'pause') return
+    while (G.fx.length) {
+      const f = G.fx.shift(), sl = slots.current.find((q) => q.life <= 0) || slots.current[0]
+      sl.sp.material.map = labelTex(f.text, f.color); sl.sp.material.needsUpdate = true
+      sl.sp.position.set(f.x, f.y, f.z); sl.life = 0.9; sl.sp.visible = true
+    }
+    for (const q of slots.current) {
+      if (q.life <= 0) { q.sp.visible = false; continue }
+      q.life -= dt; q.sp.position.y += dt * 1.6
+      q.sp.material.opacity = Math.min(1, q.life * 3)
+      const k = 1 + Math.max(0, q.life - 0.65) * 3
+      q.sp.scale.set(2.8 * k, 0.7 * k, 1)
+    }
+  })
+  return [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+    <sprite key={i} visible={false} ref={(e) => { if (e) slots.current[i] = { sp: e, life: 0 } }}>
+      <spriteMaterial transparent depthTest={false} toneMapped={false} />
+    </sprite>
+  ))
+}
+
 export default function Missions() {
   return (
     <>
       {PADS.map((p) => <Pad key={p.id} p={p} />)}
-      <Beacon /><Beacon next /><HideLabel /><Cops /><Rivals />
+      <Beacon /><Beacon next /><HideLabel /><Cops /><Rivals /><Cng /><Crowd /><Fx />
     </>
   )
 }

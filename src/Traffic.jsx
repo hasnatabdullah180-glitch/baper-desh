@@ -19,6 +19,16 @@ function partsFor(type, c) {
       wheel(0.95, 0.35, 1.35), wheel(-0.95, 0.35, 1.35), wheel(0.95, 0.35, -1.35), wheel(-0.95, 0.35, -1.35),
     ]
   }
+  if (type === 'cng') {
+    const g = '#1b9e5a'
+    return [
+      box([0, 0.75, -0.1], [1.3, 0.7, 2.4], g), box([0, 0.95, -0.1], [1.34, 0.1, 2.44], '#ffd23f'),
+      box([0, 1.4, -0.5], [1.25, 0.62, 1.5], '#16854b'), box([0, 1.78, -0.45], [1.38, 0.1, 1.75], '#0f6a3b'),
+      box([0, 1.3, 0.3], [1.1, 0.5, 0.06], GLASS), box([0.64, 1.35, -0.5], [0.04, 0.5, 1.5], '#222'), box([-0.64, 1.35, -0.5], [0.04, 0.5, 1.5], '#222'),
+      box([0, 0.8, 1.12], [0.4, 0.2, 0.06], HEAD), box([0.4, 0.8, -1.32], [0.3, 0.16, 0.06], TAIL), box([-0.4, 0.8, -1.32], [0.3, 0.16, 0.06], TAIL),
+      wheel(0, 0.33, 1.0, 0.33, 0.16), wheel(0.62, 0.33, -0.85, 0.33, 0.2), wheel(-0.62, 0.33, -0.85, 0.33, 0.2),
+    ]
+  }
   if (type === 'bus') {
     return [
       box([0, 1.7, 0], [2.6, 2.4, 9.2], c), box([0, 2.25, 0], [2.64, 0.8, 8.3], GLASS), box([0, 1.25, 0], [2.64, 0.2, 9.22], '#ffd23f'),
@@ -49,6 +59,7 @@ const Veh = ({ type, color, children }) => (
 )
 export const CarBody = ({ color, cop }) => <Veh type="car" color={color}>{cop}</Veh>
 export const BusBody = ({ color }) => <Veh type="bus" color={color} />
+export const CngBody = ({ color = '#1b9e5a' }) => <Veh type="cng" color={color} />
 export const RickshawBody = ({ color }) => <Veh type="rick" color={color} />
 
 const torso = (c) => {
@@ -92,8 +103,10 @@ export function Npcs() {
     const t = s.clock.elapsedTime
     G.npcs.forEach((p, i) => {
       const o = refs.current[i]; if (!o) return
-      o.position.set(p.x, 0.12, p.z); o.rotation.y = p.ry
-      const l = limbs.current[i].current, sw = Math.sin(t * (p.scare > 0 ? 14 : 5) + i) * (p.scare > 0 ? 0.9 : 0.55)
+      o.rotation.order = 'YXZ'
+      const dn = p.down > 0
+      o.position.set(p.x, dn ? 0.3 : 0.12, p.z); o.rotation.y = p.ry; o.rotation.x = dn ? -1.45 : 0 // knocked flat
+      const l = limbs.current[i].current, sw = p.down > 0 ? 0 : Math.sin(t * (p.scare > 0 ? 14 : 5) + i) * (p.scare > 0 ? 0.9 : 0.55)
       if (l.l) { l.l.rotation.x = sw; l.r.rotation.x = -sw; l.al.rotation.x = -sw; l.ar.rotation.x = sw }
     })
   })

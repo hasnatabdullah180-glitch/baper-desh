@@ -21,6 +21,11 @@ let s = {
   toasts: [],
   result: null,
   muted: isMuted(),
+  damage: saved.damage || 0,
+  hp: 100,
+  mob: 0,
+  news: null,
+  touch: false,
 }
 
 export const hud = {
@@ -34,7 +39,7 @@ export const levelStart = (n) => 120 * (n - 1) * (n - 1)
 export const levelOf = (xp) => Math.floor(Math.sqrt(xp / 120)) + 1
 
 export function saveNow() {
-  try { localStorage.setItem(KEY, JSON.stringify({ xp: s.xp, chaos: s.chaos, best: s.best })) } catch { /* ignore */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ xp: s.xp, chaos: s.chaos, best: s.best, damage: s.damage })) } catch { /* ignore */ }
 }
 
 let tid = 0
@@ -65,3 +70,34 @@ export function recordBest(id, t) {
 }
 
 export function toggleMute() { const m = !s.muted; setMuted(m); hud.set({ muted: m }) }
+
+// ৳ with Bangladeshi digit grouping, e.g. ৳১,২৫,০০০
+export const taka = (n) => '৳' + bn(Math.round(n).toLocaleString('en-IN'))
+
+// ---- breaking-news popup ----
+let nid = 0, ntm
+export function news(headline, sub = '', big = false) {
+  const id = ++nid
+  sfx('news')
+  hud.set({ news: { id, headline, sub, big } })
+  clearTimeout(ntm)
+  ntm = setTimeout(() => { if (s.news?.id === id) hud.set({ news: null }) }, big ? 6500 : 5200)
+}
+export const clearNews = () => { clearTimeout(ntm); if (s.news) hud.set({ news: null }) }
+
+// ---- damage to the country, in taka ----
+const DMG_NEWS = [
+  [100000, 'ক্ষতির অঙ্ক ১ লাখ টাকা ছাড়াল!', 'সিটি করপোরেশন গভীর চিন্তিত'],
+  [500000, 'রাস্তার ক্ষতি ৫ লাখ ছাড়াল, ঠিকাদার খুশি!', 'নতুন বাজেট পাসের অপেক্ষায়'],
+  [1000000, 'ক্ষতি ১০ লাখ! বিশেষজ্ঞ: “এই ছেলে একাই GDP কমাচ্ছে”', 'অর্থনীতিবিদরা জরুরি সভায়'],
+  [5000000, 'ক্ষতি ৫০ লাখ! আন্তর্জাতিক মিডিয়ায় আলোচনা', '“বাপের দেশ” এখন বিশ্বের শিরোনামে'],
+]
+let lastCash = 0
+export function addDamage(n) {
+  const before = s.damage
+  hud.set({ damage: before + n })
+  const now = performance.now()
+  if (now - lastCash > 250) { lastCash = now; sfx('cash') }
+  for (const [t, h, sub] of DMG_NEWS) if (before < t && s.damage >= t) news(h, sub)
+  saveNow()
+}

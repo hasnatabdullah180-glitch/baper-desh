@@ -60,7 +60,7 @@ function Scene({ shadows }) {
 
 export default function Game() {
   const [fonts, setFonts] = useState(false)
-  const [dpr, setDpr] = useState(1.25)
+  const [dpr, setDpr] = useState(() => (window.matchMedia?.('(pointer: coarse)').matches ? 0.9 : 1.25))
   const [shadows, setShadows] = useState(true)
   useEffect(() => {
     let on = true

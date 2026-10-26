@@ -57,6 +57,14 @@ export function labelTex(text, color) {
   })
 }
 
+export function textTex(text, color) {
+  return canvasTex(`t|${text}|${color}`, 256, 96, (g, w, h) => {
+    fitText(g, text, w - 20, 80, 800)
+    g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.fillText(text, w / 2, h / 2 + 3)
+  })
+}
+
 export function flagTex() {
   return canvasTex('flag', 256, 160, (g, w, h) => {
     g.fillStyle = '#006a4e'; g.fillRect(0, 0, w, h)

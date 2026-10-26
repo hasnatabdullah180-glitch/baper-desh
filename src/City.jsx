@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { BOX, CYL, ICO, PLANE, mat, facadeTex, flagTex, signAtlas, Inst } from './gfx.jsx'
+import Landmarks from './Landmarks.jsx'
 import { ROADS, RW, buildings, slabs, trees, lamps, PALETTE, FLAG, SIGNS, SCOL } from './world'
 
 const asphalt = mat('#3b3e44', { roughness: 0.95 })
@@ -107,8 +108,8 @@ export default function City() {
       <Roads />
       <Inst geo={BOX} mat={mat('#ffffff')} items={slabItems} />
       <mesh geometry={CYL} material={mat('#4f9d4a')} position={[FLAG.x, 0.14, FLAG.z]} scale={[9, 0.04, 9]} receiveShadow />
-      <mesh geometry={CYL} material={mat('#cfcfcf')} position={[FLAG.x, 5, FLAG.z]} scale={[0.1, 10, 0.1]} castShadow />
-      <mesh geometry={PLANE} position={[FLAG.x + 1.6, 8.6, FLAG.z]} scale={[3.2, 2, 1]}>
+      <mesh geometry={CYL} material={mat('#cfcfcf')} position={[FLAG.x + 11, 5, FLAG.z + 11]} scale={[0.1, 10, 0.1]} castShadow />
+      <mesh geometry={PLANE} position={[FLAG.x + 12.6, 8.6, FLAG.z + 11]} scale={[3.2, 2, 1]}>
         <meshBasicMaterial map={flagTex()} side={THREE.DoubleSide} toneMapped={false} />
       </mesh>
       {geos.map((g, i) => g && <mesh key={i} geometry={g} material={mats[i]} castShadow receiveShadow />)}
@@ -119,6 +120,7 @@ export default function City() {
       <Inst geo={BOX} mat={mat('#ffffff')} items={signs.awnings} shadow />
       <Inst geo={CYL} mat={mat('#6b4a2b')} items={trunks} shadow />
       <Inst geo={ICO} mat={mat('#ffffff')} items={crowns} shadow />
+      <Landmarks />
       <Inst geo={BOX} mat={mat('#4a4f57')} items={poles} />
       <Inst geo={BOX} mat={mat('#fff1b0', { emissive: '#ffd966', emissiveIntensity: 1.6 })} items={heads} />
     </>

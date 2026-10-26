@@ -26,9 +26,11 @@ const RACE = [[80, 0], [80, 80], [0, 80], [0, 0], [80, 0], [80, 40]]
 const HIDE = [-80, -80]
 export const HIDEOUT = HIDE
 
-const VT = { car: { hl: 2.2, hw: 1.0 }, bus: { hl: 4.7, hw: 1.4 }, rick: { hl: 1.5, hw: 0.7 } }
+const VT = { car: { hl: 2.2, hw: 1.0 }, bus: { hl: 4.7, hw: 1.4 }, rick: { hl: 1.5, hw: 0.7 }, ezy: { hl: 1.4, hw: 0.75 }, bike: { hl: 1.0, hw: 0.45 } }
 const CARCOL = ['#e63946', '#f4a261', '#2a9d8f', '#264653', '#e9c46a', '#8d99ae', '#fb8500', '#6a4c93', '#f1faee']
-const BUSCOL = ['#d62828', '#f77f00', '#0077b6', '#2d6a4f']
+const BUSCOL = ['#d62828', '#d62828', '#c1121f'] // BRTC red
+const EZYCOL = ['#1b9e5a', '#1b9e5a', '#16a34a'] // green battery auto
+const BIKECOL = ['#ff7b00', '#ff7b00', '#ff7b00', '#e63946'] // orange dirt bikes
 const RICKCOL = ['#e63946', '#ffb703', '#06d6a0', '#118ab2', '#ef476f', '#8338ec']
 const NPCCOL = ['#e76f51', '#2a9d8f', '#264653', '#e9c46a', '#8338ec', '#ffffff', '#06d6a0', '#f4a261']
 
@@ -42,11 +44,11 @@ function initWorld() {
         const off = ax === 'x' ? (dir > 0 ? r - 3.2 : r + 3.2) : dir > 0 ? r + 3.2 : r - 3.2
         const speed = rnd(5, 8.5), ph = Math.random() * 113
         for (let k = 0; k < 3; k++) {
-          const type = ['car', 'bus', 'rick', 'car', 'rick', 'bus'][(n + k) % 6]
+          const type = ['car', 'bus', 'ezy', 'car', 'bike', 'bus', 'rick', 'bike'][(n + k) % 8]
           const sp = VT[type]
           G.vehicles.push({
             ax, dir, off, speed, type, s: -170 + ((ph + k * 113) % 340),
-            color: type === 'bus' ? pick(BUSCOL) : type === 'rick' ? pick(RICKCOL) : pick(CARCOL),
+            color: type === 'bus' ? pick(BUSCOL) : type === 'rick' ? pick(RICKCOL) : type === 'ezy' ? pick(EZYCOL) : type === 'bike' ? pick(BIKECOL) : pick(CARCOL),
             hx: ax === 'x' ? sp.hl : sp.hw, hz: ax === 'x' ? sp.hw : sp.hl,
             x: 0, z: 0, ry: 0, vx: ax === 'x' ? dir * speed : 0, vz: ax === 'z' ? dir * speed : 0, cd: 0,
           })
@@ -377,7 +379,7 @@ function doPunch() {
     addChaos(10)
   } else if (k === 'veh') {
     r.halt = 2.5
-    const [a, b] = r.type === 'bus' ? [60000, 120000] : r.type === 'car' ? [25000, 60000] : [6000, 15000]
+    const [a, b] = r.type === 'bus' ? [60000, 120000] : r.type === 'car' ? [25000, 60000] : r.type === 'bike' ? [4000, 9000] : [6000, 15000]
     fx(pick(['ঠং!', 'দড়াম!', 'ক্যাঁচ!']), tx, 2.4, tz); sfx('punch'); setTimeout(() => sfx(r.type === 'rick' ? 'bell' : 'honk'), 120)
     addDamage(rint(a, b)); addChaos(25, Math.random() < 0.5 ? pick(JAM_LINES) : '')
     G.mob += 12; addHeat(0.45)

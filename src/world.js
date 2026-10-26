@@ -32,6 +32,8 @@ export const PADS = [
   { id: 'cng', x: 40, z: 22, color: '#ff7b00', label: 'অটো ধর' },
 ]
 export const FLAG = { x: 40, z: 40 }
+circles.push({ x: FLAG.x, z: FLAG.z, r: 6.6 }) // Shapla fountain
+for (let x = -200; x <= 170; x += 22) if (ROADS.every((r) => Math.abs(x - r) > 8)) circles.push({ x, z: -80, r: 0.9 }) // expressway piers
 
 BX.forEach(([x0, x1], i) =>
   BX.forEach(([z0, z1], j) => {

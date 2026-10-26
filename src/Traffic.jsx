@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { BOX, CYL, SPH, mat, mergeParts } from './gfx.jsx'
+import { BOX, CYL, SPH, PLANE, mat, mergeParts, textTex } from './gfx.jsx'
 import { G } from './sim'
 
 // Every vehicle / person torso is merged into ONE vertex-coloured mesh (1 draw call each).
@@ -19,19 +19,33 @@ function partsFor(type, c) {
       wheel(0.95, 0.35, 1.35), wheel(-0.95, 0.35, 1.35), wheel(0.95, 0.35, -1.35), wheel(-0.95, 0.35, -1.35),
     ]
   }
-  if (type === 'cng') {
-    const g = '#1b9e5a'
+  if (type === 'cng' || type === 'ezy') { // green battery easy-bike: red seats, canopy, front wheel on a fork
+    const RED = '#d62839'
     return [
-      box([0, 0.75, -0.1], [1.3, 0.7, 2.4], g), box([0, 0.95, -0.1], [1.34, 0.1, 2.44], '#ffd23f'),
-      box([0, 1.4, -0.5], [1.25, 0.62, 1.5], '#16854b'), box([0, 1.78, -0.45], [1.38, 0.1, 1.75], '#0f6a3b'),
-      box([0, 1.3, 0.3], [1.1, 0.5, 0.06], GLASS), box([0.64, 1.35, -0.5], [0.04, 0.5, 1.5], '#222'), box([-0.64, 1.35, -0.5], [0.04, 0.5, 1.5], '#222'),
-      box([0, 0.8, 1.12], [0.4, 0.2, 0.06], HEAD), box([0.4, 0.8, -1.32], [0.3, 0.16, 0.06], TAIL), box([-0.4, 0.8, -1.32], [0.3, 0.16, 0.06], TAIL),
-      wheel(0, 0.33, 1.0, 0.33, 0.16), wheel(0.62, 0.33, -0.85, 0.33, 0.2), wheel(-0.62, 0.33, -0.85, 0.33, 0.2),
+      box([0, 0.55, -0.1], [1.05, 0.18, 2.1], c), box([0.55, 0.85, -0.2], [0.08, 0.5, 1.5], c), box([-0.55, 0.85, -0.2], [0.08, 0.5, 1.5], c), box([0, 0.85, -0.95], [1.05, 0.5, 0.08], c),
+      box([0, 1.0, -0.35], [0.95, 0.12, 0.7], RED), box([0, 1.4, -0.72], [0.95, 0.7, 0.1], RED), box([0, 1.0, -0.8], [0.95, 0.12, 0.3], RED),
+      box([0.55, 1.9, 0.0], [0.06, 1.1, 0.06], '#2f3a35'), box([-0.55, 1.9, 0.0], [0.06, 1.1, 0.06], '#2f3a35'), box([0.55, 1.9, -1.0], [0.06, 1.1, 0.06], '#2f3a35'), box([-0.55, 1.9, -1.0], [0.06, 1.1, 0.06], '#2f3a35'),
+      box([0, 2.48, -0.5], [1.4, 0.12, 1.7], '#262b28'), box([0, 2.4, 0.38], [1.4, 0.08, 0.06], '#e8a317'), box([0, 2.4, -1.38], [1.4, 0.08, 0.06], '#e8a317'),
+      box([0, 0.95, 0.95], [0.5, 0.5, 0.15], c), box([0, 1.1, 1.05], [0.4, 0.22, 0.06], HEAD), box([0, 1.45, 0.9], [0.9, 0.06, 0.06], '#333'), box([0, 0.7, 1.0], [0.1, 0.8, 0.1], '#aaa'),
+      wheel(0, 0.33, 1.05, 0.33, 0.14), wheel(0.55, 0.33, -0.85, 0.33, 0.16), wheel(-0.55, 0.33, -0.85, 0.33, 0.16),
     ]
   }
-  if (type === 'bus') {
+  if (type === 'bike') { // orange dirt bike + rider
     return [
-      box([0, 1.7, 0], [2.6, 2.4, 9.2], c), box([0, 2.25, 0], [2.64, 0.8, 8.3], GLASS), box([0, 1.25, 0], [2.64, 0.2, 9.22], '#ffd23f'),
+      wheel(0, 0.38, 0.7, 0.38, 0.1), wheel(0, 0.38, -0.7, 0.38, 0.1),
+      box([0, 0.75, 0.0], [0.25, 0.35, 1.0], '#222'), box([0, 1.0, -0.2], [0.28, 0.2, 0.9], c), box([0, 1.12, -0.1], [0.3, 0.1, 0.7], '#111'),
+      box([0, 0.8, 0.75], [0.1, 0.7, 0.1], '#d4b106', [0.35, 0, 0]), box([0, 0.9, 0.82], [0.2, 0.06, 0.55], c), box([0, 1.32, 0.52], [0.7, 0.06, 0.06], '#111'), box([0, 1.05, 0.98], [0.3, 0.3, 0.06], c),
+      box([0.16, 0.55, -0.8], [0.1, 0.1, 0.6], '#aaa'),
+      box([0, 1.6, -0.15], [0.4, 0.55, 0.25], '#2a2f36', [0.25, 0, 0]), { g: SPH, p: [0, 2.03, 0.0], s: [0.19, 0.19, 0.19], c: '#f1f1f1' },
+      box([0.24, 1.55, 0.25], [0.08, 0.08, 0.7], '#2a2f36'), box([-0.24, 1.55, 0.25], [0.08, 0.08, 0.7], '#2a2f36'), box([0.14, 1.15, 0.1], [0.1, 0.1, 0.5], '#2a2f36'), box([-0.14, 1.15, 0.1], [0.1, 0.1, 0.5], '#2a2f36'),
+    ]
+  }
+  if (type === 'bus') { // BRTC-style: red body, window grid, centre doors, green-white-green stripes
+    return [
+      box([0, 1.7, 0], [2.6, 2.4, 9.2], c), box([0, 2.3, 0], [2.64, 0.75, 8.6], GLASS),
+      ...[-3.6, -2.4, -1.2, 1.4, 2.6, 3.8].map((k) => box([0, 2.3, k], [2.66, 0.8, 0.07], c)),
+      box([0, 1.58, 0], [2.64, 0.07, 9.22], '#1f8a4c'), box([0, 1.45, 0], [2.64, 0.06, 9.22], '#ffffff'), box([0, 1.33, 0], [2.64, 0.07, 9.22], '#1f8a4c'),
+      box([1.31, 1.95, 0.3], [0.06, 2.1, 1.3], '#6e1b1b'), box([-1.31, 1.95, 0.3], [0.06, 2.1, 1.3], '#6e1b1b'),
       box([0, 2.35, 4.58], [2.2, 1, 0.06], GLASS), box([0.9, 0.8, 4.62], [0.4, 0.25, 0.06], HEAD), box([-0.9, 0.8, 4.62], [0.4, 0.25, 0.06], HEAD),
       wheel(1.3, 0.5, 3, 0.5, 0.3), wheel(-1.3, 0.5, 3, 0.5, 0.3), wheel(1.3, 0.5, -3, 0.5, 0.3), wheel(-1.3, 0.5, -3, 0.5, 0.3),
     ]
@@ -51,9 +65,12 @@ const geoFor = (type, c) => {
   if (!cache.has(k)) cache.set(k, mergeParts(partsFor(type, c)))
   return cache.get(k)
 }
+const brtcM = new THREE.MeshBasicMaterial({ map: textTex('BRTC', '#ffffff'), transparent: true, toneMapped: false })
+const BusText = () => [1, -1].map((s) => <mesh key={s} geometry={PLANE} material={brtcM} position={[s * 1.32, 1.0, -2.6]} rotation={[0, s * Math.PI / 2, 0]} scale={[2.4, 0.9, 1]} />)
 const Veh = ({ type, color, children }) => (
   <group>
     <mesh geometry={geoFor(type, color)} material={vehMat} castShadow />
+    {type === 'bus' && <BusText />}
     {children}
   </group>
 )

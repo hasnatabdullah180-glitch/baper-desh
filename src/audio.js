@@ -1,6 +1,6 @@
 // Procedural WebAudio engine — no audio files, nothing to fail to load.
 const KEY = 'baperdesh.muted'
-let ctx = null, master = null, amb = null, sir = null, mobG = null
+let ctx = null, master = null, amb = null, sir = null, mobG = null, eng = null, engG = null, engOn = false, engLvl = 0, engKind = 'car'
 let muted = false
 try { muted = localStorage.getItem(KEY) === '1' } catch { /* ignore */ }
 let active = false, wantAmb = false, wantSiren = false, wantMob = false
@@ -38,6 +38,11 @@ export function initAudio() {
       wob.connect(wg); wg.connect(wobG.gain); wob.start()
       mobG = ctx.createGain(); mobG.gain.value = 0
       src.connect(bp); bp.connect(wobG); wobG.connect(mobG); mobG.connect(master)
+      // vehicle engine: soft low-passed saw whose pitch follows the speed (silent unless driving)
+      eng = ctx.createOscillator(); eng.type = 'sawtooth'; eng.frequency.value = 60
+      const elp = ctx.createBiquadFilter(); elp.type = 'lowpass'; elp.frequency.value = 380
+      engG = ctx.createGain(); engG.gain.value = 0
+      eng.connect(elp); elp.connect(engG); engG.connect(master); eng.start()
       // police siren: square wave swept by an LFO
       const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain()
       o.type = 'triangle'; o.frequency.value = 850; lfo.frequency.value = 1.4; lg.gain.value = 260
@@ -56,6 +61,15 @@ function apply() {
   amb.gain.setTargetAtTime(active && wantAmb ? 0.03 : 0, t, 0.15)
   sir.gain.setTargetAtTime(active && wantSiren ? 0.025 : 0, t, 0.1)
   mobG.gain.setTargetAtTime(active && wantMob ? 0.25 : 0, t, 0.25)
+  const F = { car: [55, 120], bus: [38, 70], ezy: [70, 110], bike: [85, 210], rick: [0, 0] }[engKind] || [55, 110]
+  engG.gain.setTargetAtTime(active && engOn && F[0] ? 0.03 + engLvl * 0.025 : 0, t, 0.08)
+  eng.frequency.setTargetAtTime(F[0] + engLvl * F[1], t, 0.08)
+}
+// engine hum while driving: level 0..1 = speed, kind = vehicle type; engine(null) switches it off
+export function engine(level, kind) {
+  if (level == null) { if (engOn) { engOn = false; apply() } return }
+  engOn = true; engLvl = Math.max(0, Math.min(1, level)); engKind = kind || engKind
+  if (ctx) apply()
 }
 export function setActive(a) { active = a; wantAmb = a || wantAmb; apply() }
 export function siren(on) { wantSiren = on; apply() }
@@ -119,6 +133,15 @@ const SFX = {
   crash: () => { noise(0.5, 0.7, 700); tone(70, 0.4, 'triangle', 0.25, -30) },
   clang: () => { tone(880, 0.5, 'triangle', 0.1, -40); tone(1320, 0.5, 'sine', 0.1, 0, 0.01); noise(0.05, 0.4, 3000, 'highpass') },
   fart: () => { tone(90, 0.35, 'triangle', 0.2, -35, 0, 40) }, // classic gag for a missed punch on a bystander
+  // ---- meme sounds (synthesised, no audio files) ----
+  boom: () => { tone(120, 0.9, 'sine', 0.6, -85); tone(60, 1.2, 'sine', 0.45, -25, 0.02); noise(0.12, 0.35, 300) }, // "vine boom"
+  airhorn: () => { for (const d of [0, 0.3, 0.6]) for (const f of [466, 587, 698]) tone(f, 0.22, 'sawtooth', 0.05, 0, d); for (const f of [466, 587, 698]) tone(f, 0.7, 'sawtooth', 0.05, 0, 0.9) },
+  scratch: () => { noise(0.4, 0.3, 1600, 'bandpass'); tone(1000, 0.3, 'sawtooth', 0.06, -800) }, // record scratch
+  bruh: () => { tone(190, 0.55, 'sawtooth', 0.09, -90, 0, 5); tone(95, 0.55, 'sine', 0.2, -30) },
+  violin: () => { [440, 415, 392, 370].forEach((f, i) => tone(f, 0.5, 'triangle', 0.14, -6, i * 0.5, 7)) }, // sad violin
+  sparkle: () => seq([1319, 1568, 1976, 2637], 0.07, 'sine', 0.08, 0.3),
+  rimshot: () => { tone(180, 0.1, 'sine', 0.3, -60); tone(140, 0.1, 'sine', 0.3, -40, 0.14); noise(0.5, 0.25, 6000, 'highpass', 0.3) },
+  screech: () => { noise(0.45, 0.16, 2600, 'bandpass'); tone(1500, 0.4, 'triangle', 0.03, -500) },
   caught: () => seq([880, 988, 1175, 1568], 0.08, 'triangle', 0.1, 0.18),
 }
 const lastSfx = {}

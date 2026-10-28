@@ -10,6 +10,11 @@ const WHEEL = '#16181c', GLASS = '#1d2a35', HEAD = '#fff3b0', TAIL = '#ff3030'
 const box = (p, s, c, r) => ({ g: BOX, p, s, c, r })
 const wheel = (x, y, z, r = 0.35, w = 0.25) => ({ g: CYL, p: [x, y, z], s: [r, w, r], r: [0, 0, Math.PI / 2], c: WHEEL })
 
+const riderParts = () => [
+  box([0, 1.6, -0.15], [0.4, 0.55, 0.25], '#2a2f36', [0.25, 0, 0]), { g: SPH, p: [0, 2.03, 0.0], s: [0.19, 0.19, 0.19], c: '#f1f1f1' },
+  box([0.24, 1.55, 0.25], [0.08, 0.08, 0.7], '#2a2f36'), box([-0.24, 1.55, 0.25], [0.08, 0.08, 0.7], '#2a2f36'), box([0.14, 1.15, 0.1], [0.1, 0.1, 0.5], '#2a2f36'), box([-0.14, 1.15, 0.1], [0.1, 0.1, 0.5], '#2a2f36'),
+]
+
 function partsFor(type, c) {
   if (type === 'car') {
     return [
@@ -27,18 +32,18 @@ function partsFor(type, c) {
       box([0.55, 1.9, 0.0], [0.06, 1.1, 0.06], '#2f3a35'), box([-0.55, 1.9, 0.0], [0.06, 1.1, 0.06], '#2f3a35'), box([0.55, 1.9, -1.0], [0.06, 1.1, 0.06], '#2f3a35'), box([-0.55, 1.9, -1.0], [0.06, 1.1, 0.06], '#2f3a35'),
       box([0, 2.48, -0.5], [1.4, 0.12, 1.7], '#262b28'), box([0, 2.4, 0.38], [1.4, 0.08, 0.06], '#e8a317'), box([0, 2.4, -1.38], [1.4, 0.08, 0.06], '#e8a317'),
       box([0, 0.95, 0.95], [0.5, 0.5, 0.15], c), box([0, 1.1, 1.05], [0.4, 0.22, 0.06], HEAD), box([0, 1.45, 0.9], [0.9, 0.06, 0.06], '#333'), box([0, 0.7, 1.0], [0.1, 0.8, 0.1], '#aaa'),
+      box([0, 0.95, 0.2], [0.5, 0.1, 0.4], RED),
       wheel(0, 0.33, 1.05, 0.33, 0.14), wheel(0.55, 0.33, -0.85, 0.33, 0.16), wheel(-0.55, 0.33, -0.85, 0.33, 0.16),
     ]
   }
-  if (type === 'bike') { // orange dirt bike + rider
-    return [
+  if (type === 'bike' || type === 'bike0') { // orange dirt bike (+ its own rider in traffic; 'bike0' is the empty one the player rides)
+    const frame = [
       wheel(0, 0.38, 0.7, 0.38, 0.1), wheel(0, 0.38, -0.7, 0.38, 0.1),
       box([0, 0.75, 0.0], [0.25, 0.35, 1.0], '#222'), box([0, 1.0, -0.2], [0.28, 0.2, 0.9], c), box([0, 1.12, -0.1], [0.3, 0.1, 0.7], '#111'),
       box([0, 0.8, 0.75], [0.1, 0.7, 0.1], '#d4b106', [0.35, 0, 0]), box([0, 0.9, 0.82], [0.2, 0.06, 0.55], c), box([0, 1.32, 0.52], [0.7, 0.06, 0.06], '#111'), box([0, 1.05, 0.98], [0.3, 0.3, 0.06], c),
       box([0.16, 0.55, -0.8], [0.1, 0.1, 0.6], '#aaa'),
-      box([0, 1.6, -0.15], [0.4, 0.55, 0.25], '#2a2f36', [0.25, 0, 0]), { g: SPH, p: [0, 2.03, 0.0], s: [0.19, 0.19, 0.19], c: '#f1f1f1' },
-      box([0.24, 1.55, 0.25], [0.08, 0.08, 0.7], '#2a2f36'), box([-0.24, 1.55, 0.25], [0.08, 0.08, 0.7], '#2a2f36'), box([0.14, 1.15, 0.1], [0.1, 0.1, 0.5], '#2a2f36'), box([-0.14, 1.15, 0.1], [0.1, 0.1, 0.5], '#2a2f36'),
     ]
+    return type === 'bike0' ? frame : [...frame, ...riderParts()]
   }
   if (type === 'bus') { // BRTC-style: red body, window grid, centre doors, green-white-green stripes
     return [
@@ -54,6 +59,8 @@ function partsFor(type, c) {
     box([0, 0.45, 0], [0.9, 0.12, 2.3], '#2b2b2b'), box([0, 0.7, -0.55], [0.85, 0.28, 0.85], '#c1121f'),
     box([0, 1.0, -1.0], [0.95, 0.85, 0.08], c), box([0, 1.15, -1.05], [0.7, 0.12, 0.04], '#ffd23f'), box([0, 0.9, -1.05], [0.7, 0.12, 0.04], '#06d6a0'),
     box([0, 1.62, -0.55], [1.0, 0.07, 1.05], c, [0.22, 0, 0]),
+    ...[[-0.38, '#ffd23f'], [0, '#06d6a0'], [0.38, '#ffffff']].map(([dz, col]) => box([0, 1.626 - dz * 0.218, -0.55 + dz * 0.976], [1.02, 0.08, 0.13], col, [0.22, 0, 0])),
+    box([0, 1.5, 0.0], [1.0, 0.05, 0.05], '#ffd23f'), box([0.3, 1.3, 0.0], [0.03, 0.25, 0.03], '#ef476f'), box([-0.3, 1.3, 0.0], [0.03, 0.25, 0.03], '#118ab2'),
     box([0.47, 1.1, -0.05], [0.05, 1.0, 0.05], '#444'), box([-0.47, 1.1, -0.05], [0.05, 1.0, 0.05], '#444'), box([0, 1.0, 0.95], [0.7, 0.05, 0.05], '#444'),
     wheel(0.52, 0.42, -0.5, 0.42, 0.06), wheel(-0.52, 0.42, -0.5, 0.42, 0.06), wheel(0, 0.38, 1.05, 0.38, 0.06),
   ]
@@ -99,17 +106,25 @@ export function Person({ c, limbs }) {
   )
 }
 
+const riderGeo = () => { const k = 'rider'; if (!cache.has(k)) cache.set(k, mergeParts(riderParts().map((p) => ({ ...p, c: p.c })))); return cache.get(k) }
 export function Traffic() {
-  const refs = useRef([])
+  const refs = useRef([]), riders = useRef([])
   useFrame(() => {
     G.vehicles.forEach((v, i) => {
       const o = refs.current[i]
       if (o) { o.position.set(v.x, 0.12, v.z); o.rotation.y = v.ry }
+      const rd = riders.current[i]
+      if (rd) rd.visible = !v.player
     })
   })
   return G.vehicles.map((v, i) => (
     <group key={i} ref={(e) => (refs.current[i] = e)}>
-      <Veh type={v.type} color={v.color} />
+      {v.type === 'bike' ? (
+        <>
+          <mesh geometry={geoFor('bike0', v.color)} material={vehMat} castShadow />
+          <mesh ref={(e) => (riders.current[i] = e)} geometry={riderGeo()} material={vehMat} castShadow />
+        </>
+      ) : <Veh type={v.type} color={v.color} />}
     </group>
   ))
 }

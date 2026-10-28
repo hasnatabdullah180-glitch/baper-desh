@@ -40,6 +40,7 @@ export function useInput() {
         if (e.code === 'Space') G.jump = true
         if (e.code === 'KeyE') G.interact = true
         if (e.code === 'KeyF') G.punch = true
+        if (e.code === 'KeyH') G.horn = true
         if (e.code === 'KeyP') pauseGame()
       } else if (e.code === 'KeyP' && st.phase === 'pause') resumeGame()
       if (e.code === 'Enter' && st.result) dismissResult()
@@ -48,6 +49,7 @@ export function useInput() {
     const mm = (e) => {
       if (hud.get().phase !== 'play') return
       if (document.pointerLockElement || e.buttons) {
+        G.lookT = G.t
         G.yaw -= e.movementX * 0.0026
         G.pitch = Math.max(-0.15, Math.min(1.2, G.pitch + e.movementY * 0.0022))
       }

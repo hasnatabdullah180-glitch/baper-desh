@@ -6,17 +6,17 @@ import { startGame, resumeGame, pauseGame, toMenu, dismissResult } from './contr
 
 const CONTROLS = [
   ['W A S D', 'চলো'], ['মাউস', 'ক্যামেরা ঘোরাও'], ['Space', 'লাফ দাও'],
-  ['Shift', 'দৌড়াও'], ['E', 'ইন্টারঅ্যাক্ট / মিশন শুরু'], ['F / ক্লিক', 'ঘুষি মারো'], ['P / Esc', 'বিরতি'], ['M', 'শব্দ চালু/বন্ধ'],
+  ['Shift', 'দৌড়াও'], ['E', 'গাড়িতে ওঠো-নামো / মিশন'], ['F / ক্লিক', 'ঘুষি মারো'], ['H', 'হর্ন (গাড়িতে)'], ['Space', 'ব্রেক/ড্রিফট (গাড়িতে)'], ['P / Esc', 'বিরতি'], ['M', 'শব্দ চালু/বন্ধ'],
 ]
-const TOUCH_CONTROLS = [['বাঁ দিকে স্লাইড', 'চলো (পুরো ঠেললে দৌড়)'], ['ডান দিকে ড্র্যাগ', 'ক্যামেরা ঘোরাও'], ['✊', 'ঘুষি মারো'], ['⤴', 'লাফ দাও'], ['⚡', 'ধরে রাখলে দৌড়'], ['E', 'মিশন শুরু / ধমক']]
+const TOUCH_CONTROLS = [['বাঁ দিকে স্লাইড', 'চলো (পুরো ঠেললে দৌড়)'], ['ডান দিকে ড্র্যাগ', 'ক্যামেরা ঘোরাও'], ['✊ (গাড়িতে 📯)', 'ঘুষি মারো / হর্ন'], ['⤴', 'লাফ / গাড়িতে ব্রেক'], ['⚡', 'দৌড় / নাইট্রো'], ['E', 'গাড়িতে ওঠো-নামো / মিশন']]
 const NAMES = { boss: 'ট্রাফিক বস', race: 'রিকশা রেসার', chase: 'পুলিশ চেজ', cng: 'অটো ধর' }
 
 function Controls() {
   const touch = useHud((s) => s.touch)
   return (
     <div className="controls">
-      {(touch ? TOUCH_CONTROLS : CONTROLS).map(([k, v]) => (
-        <div key={k}><kbd>{k}</kbd><span>{v}</span></div>
+      {(touch ? TOUCH_CONTROLS : CONTROLS).map(([k, v], i) => (
+        <div key={i}><kbd>{k}</kbd><span>{v}</span></div>
       ))}
     </div>
   )
@@ -69,11 +69,24 @@ function Start() {
         </section>
         <section className="panel">
           <h3>মিশন</h3>
-          <p className="tiny">প্লাজার জ্বলজ্বলে প্যাডে গিয়ে <kbd>E</kbd> চাপো।<br />ট্রাফিক বস · রিকশা রেসার · পুলিশ চেজ · অটো ধর<br />ঘুষি মেরে দেশের ক্ষতি করো — কিন্তু বেশি করলে জনতা গণধোলাই দেবে!</p>
+          <p className="tiny">প্লাজার জ্বলজ্বলে প্যাডে গিয়ে <kbd>E</kbd> চাপো।<br />ট্রাফিক বস · রিকশা রেসার · পুলিশ চেজ · অটো ধর<br />যেকোনো গাড়ির কাছে গিয়ে <kbd>E</kbd> চাপলেই চালাতে পারবে — বাস, ইজি-বাইক, মোটরবাইক, রিকশা!<br />বেশি তাণ্ডব করলে জনতা গণধোলাই দেবে!</p>
         </section>
       </div>
     </div>
   )
+}
+
+function Meme() {
+  const m = useHud((s) => s.meme)
+  if (!m) return null
+  return <div key={m.id} className="meme"><span>{m.text}</span></div>
+}
+
+function Speedo() {
+  const ride = useHud((s) => s.ride)
+  const speed = useHud((s) => s.speed)
+  if (!ride) return null
+  return <div className="speedo"><b>{bn(speed)}</b><small>কিমি/ঘ</small><em>{ride.label}</em></div>
 }
 
 function News() {
@@ -140,7 +153,8 @@ function Hud() {
         </div>
         <div className="btns"><MuteBtn /><button className="pausebtn" onClick={pauseGame}>⏸ বিরতি</button></div>
       </div>
-      <div className="br"><Minimap /></div>
+      <Meme />
+      <div className="br"><Speedo /><Minimap /></div>
       <div className="bl panel"><Controls /></div>
       {touch && <Touch />}
       <div className="bc">

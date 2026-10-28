@@ -141,3 +141,15 @@ body.touch .wanted span { font-size: 18px; } body.touch .tr { gap: 6px; } body.t
   .card { padding: 14px 22px; } .card h2 { font-size: 36px; } .card .controls { display: none; }
 }
 @media (max-width: 700px) { .panels .panel { min-width: 220px; } .news { width: min(400px, 60vw); } }
+
+/* ---------- v4: meme captions, speedometer ---------- */
+.meme { position: absolute; left: 50%; top: 62%; transform: translateX(-50%) rotate(-2deg); max-width: min(900px, 92vw); text-align: center; pointer-events: none; animation: memepop .35s cubic-bezier(.2, 1.6, .4, 1), memeshake .12s 3 .35s; z-index: 4; }
+.meme span { display: inline-block; font: 800 clamp(26px, 4.4vw, 52px)/1.15 var(--display); color: #fff200; -webkit-text-stroke: 3px #000; paint-order: stroke fill; text-shadow: 0 5px 0 #000, 0 0 18px rgba(0, 0, 0, .55); }
+@keyframes memepop { from { transform: translateX(-50%) rotate(-2deg) scale(.3); opacity: 0; } }
+@keyframes memeshake { 50% { transform: translateX(-49%) rotate(1.5deg); } }
+.speedo { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; padding: 6px 14px; border-radius: 14px; background: rgba(13, 18, 36, .82); border: 2px solid rgba(255, 255, 255, .25); box-shadow: 0 5px 0 rgba(0, 0, 0, .3); }
+.speedo b { font: 800 34px/1 var(--display); color: var(--yellow); min-width: 54px; text-align: right; }
+.speedo small { opacity: .8; } .speedo em { font: 700 14px var(--bn); opacity: .9; margin-left: 6px; font-style: normal; }
+.br { display: flex; flex-direction: column; align-items: flex-end; }
+body.touch .meme { top: 48%; } body.touch .speedo { padding: 3px 10px; } body.touch .speedo b { font-size: 22px; min-width: 40px; }
+body.touch .br { align-items: flex-start; }

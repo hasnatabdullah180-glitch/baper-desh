@@ -7,6 +7,7 @@ const R = 55 // joystick radius (px)
 // On-screen controls for phones/tablets: floating joystick (left), camera drag (right), action buttons.
 export default function Touch() {
   const prompt = useHud((s) => s.prompt)
+  const ride = useHud((s) => s.ride)
   const base = useRef(), thumb = useRef()
   const joy = useRef(null), look = useRef(null)
 
@@ -38,6 +39,7 @@ export default function Touch() {
   const lMove = (e) => {
     const l = look.current
     if (!l || l.id !== e.pointerId) return
+    G.lookT = G.t
     G.yaw -= (e.clientX - l.x) * 0.0065
     G.pitch = Math.max(-0.15, Math.min(1.2, G.pitch + (e.clientY - l.y) * 0.0055))
     l.x = e.clientX; l.y = e.clientY
@@ -55,7 +57,7 @@ export default function Touch() {
     }
   }
   const punch = hold((d) => { if (d) G.punch = true }, 220)
-  const jump = hold((d) => { if (d) G.jump = true })
+  const jump = hold((d) => { G.keys.Space = d; if (d) G.jump = true })
   const act = hold((d) => { if (d) G.interact = true })
   const run = hold((d) => { G.keys.ShiftLeft = d })
 
@@ -66,9 +68,9 @@ export default function Touch() {
       <div className="jbase" ref={base}><div className="jthumb" ref={thumb} /></div>
       <div className="tbtns">
         <button className={'tb act' + (prompt ? ' hot' : '')} {...act}>E</button>
-        <button className="tb run" {...run}>⚡</button>
-        <button className="tb jmp" {...jump}>⤴</button>
-        <button className="tb pnch" {...punch}>✊</button>
+        <button className="tb run" {...run}>{ride ? '🚀' : '⚡'}</button>
+        <button className="tb jmp" {...jump}>{ride ? '🛑' : '⤴'}</button>
+        <button className="tb pnch" {...punch}>{ride ? '📯' : '✊'}</button>
       </div>
     </div>
   )

@@ -1,68 +1,31 @@
-import { Component, useEffect, useMemo, useRef } from 'react'
+import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { G } from './sim'
 import { hud, bn } from './store'
 import { SPH, mat } from './gfx.jsx'
 import { camBlocked } from './world'
-import { Person, RickshawBody } from './Traffic.jsx'
-
-const URL = `${import.meta.env.BASE_URL}models/character.glb`
-useGLTF.preload(URL)
-
-export class ModelBoundary extends Component {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  componentDidCatch(err) { console.error('Character model failed to load:', err); hud.set({ modelError: true }) }
-  render() { return this.state.failed ? this.props.fallback : this.props.children }
-}
-
-function Hero() {
-  const { scene, animations } = useGLTF(URL)
-  const root = useRef()
-  const cur = useRef('Idle')
-  const { actions, mixer } = useAnimations(animations, root)
-  const k = useMemo(() => {
-    const b = new THREE.Box3().setFromObject(scene)
-    const h = b.max.y - b.min.y
-    return h > 0.3 && h < 20 ? 1.8 / h : 1
-  }, [scene])
-  useEffect(() => {
-    scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false } })
-    actions.Idle?.reset().play()
-  }, [scene, actions])
-  useFrame(() => {
-    mixer.timeScale = hud.get().phase === 'pause' ? 0 : 1
-    const rick = G.mode === 'rick'
-    const want = !G.grounded ? 'Run' : rick ? (G.spd > 1.5 ? 'Walk' : 'Idle') : G.spd < 0.5 ? 'Idle' : G.spd < 5.5 ? 'Walk' : 'Run'
-    if (want !== cur.current && actions[want]) {
-      actions[want].reset().fadeIn(0.2).play()
-      actions[cur.current]?.fadeOut(0.2)
-      cur.current = want
-    }
-    if (actions.Walk) actions.Walk.timeScale = THREE.MathUtils.clamp(G.spd / 2.4, 0.8, 2)
-    if (actions.Run) actions.Run.timeScale = THREE.MathUtils.clamp(G.spd / 6, 0.9, 1.6)
-  })
-  // the glTF faces -Z, game forward is +Z
-  return <group ref={root}><group rotation={[0, Math.PI, 0]}><primitive object={scene} scale={k} /></group></group>
-}
+import { RickshawBody } from './Traffic.jsx'
+import Hero from './Hero.jsx'
 
 const fistM = mat('#e0a070', { emissive: '#ff9f1c', emissiveIntensity: 0.6 })
+// where the hero sits on each vehicle (hips pivot is 0.85 above the root)
+const SEAT = { car: [0, 0.1, 0.3], ezy: [0, 0.21, 0.2], bike: [0, 0.32, -0.2], rick: [0, 0.5, 0.6], bus: [0, 1, 3] }
 export function Player() {
   const g = useRef(), r = useRef(), c = useRef(), fist = useRef(), side = useRef(0.22), prev = useRef(0)
   useFrame((s) => {
-    const rk = G.mode === 'rick'
+    const rk = G.mode === 'rick', ride = G.ride
     g.current.position.set(G.x, G.y, G.z)
     g.current.rotation.y = G.face
     g.current.rotation.z = rk ? Math.sin(s.clock.elapsedTime * 7) * 0.03 * Math.min(1, G.spd / 5) : 0
     r.current.visible = rk
-    const pt = G.punchT, lunge = pt > 0 ? Math.sin((1 - pt / 0.28) * Math.PI) : 0
+    const pt = G.punchT, lunge = pt > 0 && !ride ? Math.sin((1 - pt / 0.28) * Math.PI) : 0
     if (pt > prev.current) side.current = -side.current
     prev.current = pt
-    c.current.position.set(0, rk ? 0.5 : 0, (rk ? 0.55 : 0) + lunge * 0.35)
-    c.current.rotation.x = (G.grounded ? 0 : -0.22) + lunge * 0.5
-    fist.current.visible = pt > 0 && !rk
+    if (ride) c.current.position.set(...(SEAT[ride.type] || [0, 0, 0]))
+    else c.current.position.set(0, rk ? 0.5 : 0, (rk ? 0.55 : 0) + lunge * 0.35)
+    c.current.rotation.x = ride ? 0 : (G.grounded ? 0 : -0.22) + lunge * 0.5
+    fist.current.visible = pt > 0 && !rk && !ride
     fist.current.position.set(side.current, 1.25, 0.5 + lunge * 0.9)
     fist.current.scale.setScalar(0.15 + lunge * 0.1)
   })
@@ -70,11 +33,7 @@ export function Player() {
     <group ref={g}>
       <mesh ref={fist} geometry={SPH} material={fistM} visible={false} />
       <group ref={r} visible={false}><RickshawBody color="#e63946" /></group>
-      <group ref={c}>
-        <ModelBoundary fallback={<Person c="#2a9d8f" />}>
-          <Hero />
-        </ModelBoundary>
-      </group>
+      <group ref={c}><Hero /></group>
     </group>
   )
 }
@@ -86,9 +45,10 @@ export function CameraRig() {
     const ph = hud.get().phase
     if (ph === 'pause') return
     dt = Math.min(dt, 0.05)
-    let yaw = G.yaw, pitch = G.pitch, dist = G.mode === 'rick' ? 8 : 5.6
+    let yaw = G.yaw, pitch = G.pitch, dist = G.ride ? G.ride.spec.cam : G.mode === 'rick' ? 8 : 5.6
+    if (import.meta.env.DEV && window.__camDist) dist = window.__camDist
     if (ph === 'menu') { yaw = s.clock.elapsedTime * 0.15 + 0.6; pitch = 0.16; dist = 7 }
-    tgt.set(G.x, G.y + 1.55, G.z)
+    tgt.set(G.x, G.y + (G.ride ? (G.ride.type === 'bus' ? 2.6 : 1.9) : 1.55), G.z)
     const cp = Math.cos(pitch), dx = Math.sin(yaw) * cp, dy = Math.sin(pitch), dz = Math.cos(yaw) * cp
     let d = dist
     for (let t = 0.6; t <= dist; t += 0.4) {

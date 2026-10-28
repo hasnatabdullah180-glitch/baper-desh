@@ -45,7 +45,7 @@ function Scene({ shadows }) {
       <hemisphereLight args={['#cfe4ff', '#6b6a52', 0.95]} />
       <Sun shadows={shadows} />
       <Sky distance={450000} sunPosition={[100, 45, 60]} turbidity={5} rayleigh={1.4} />
-      <fog attach="fog" args={['#cfe0ec', 80, 320]} />
+      <fog attach="fog" args={['#cfe0ec', 120, 430]} />
       <City />
       <Traffic />
       <Npcs />

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { sfx, isMuted, setMuted } from './audio'
+import { sfx, say, isMuted, setMuted } from './audio'
+import { LINES, MEME_SFX } from './lines'
 
 const KEY = 'baperdesh.save.v1'
 let saved = {}
@@ -26,6 +27,9 @@ let s = {
   mob: 0,
   news: null,
   touch: false,
+  meme: null,
+  ride: null,
+  speed: 0,
 }
 
 export const hud = {
@@ -54,7 +58,7 @@ export function addXp(n) {
   const before = levelOf(s.xp)
   hud.set({ xp: s.xp + Math.round(n) })
   const after = levelOf(s.xp)
-  if (after > before) toast(`লেভেল আপ! তুমি এখন লেভেল ${bn(after)} — আসল ঢাকাইয়া!`, 'level')
+  if (after > before) { toast(`লেভেল আপ! তুমি এখন লেভেল ${bn(after)} — আসল ঢাকাইয়া!`, 'level'); memeLine('level', true) }
   saveNow()
 }
 
@@ -100,4 +104,22 @@ export function addDamage(n) {
   if (now - lastCash > 250) { lastCash = now; sfx('cash') }
   for (const [t, h, sub] of DMG_NEWS) if (before < t && s.damage >= t) news(h, sub)
   saveNow()
+}
+
+// ---- meme captions: big comic text + meme sound + (if the browser has a Bengali voice) spoken ----
+let mid = 0, mtm, lastMeme = 0
+export function meme(text, sound) {
+  const id = ++mid
+  if (sound) sfx(sound)
+  say(text)
+  hud.set({ meme: { id, text } })
+  clearTimeout(mtm)
+  mtm = setTimeout(() => { if (s.meme?.id === id) hud.set({ meme: null }) }, 2000)
+}
+export function memeLine(kind, force = false) {
+  const now = performance.now()
+  if (!force && now - lastMeme < 2200) return
+  lastMeme = now
+  const list = LINES[kind]
+  if (list) meme(list[Math.floor(Math.random() * list.length)], MEME_SFX[kind])
 }

@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { BOX, CYL, ICO, PLANE, mat, facadeTex, flagTex, signAtlas, Inst } from './gfx.jsx'
 import Landmarks from './Landmarks.jsx'
-import { ROADS, RW, buildings, slabs, trees, lamps, PALETTE, FLAG, SIGNS, SCOL } from './world'
+import { ROADS, RW, buildings, slabs, trees, lamps, stalls, wires, PALETTE, FLAG, SIGNS, SCOL } from './world'
 
 const asphalt = mat('#3b3e44', { roughness: 0.95 })
 const FACE = { '+z': [0, 0, 1], '-z': [Math.PI, 0, -1], '+x': [Math.PI / 2, 1, 0], '-x': [-Math.PI / 2, -1, 0] }
@@ -51,11 +51,40 @@ function useSigns() {
   }, [])
 }
 
+// Dhaka street life: market stalls with tarps, overhead cables
+function StreetLife() {
+  const d = useMemo(() => {
+    const table = [], goods = [], tarp = [], poles = []
+    stalls.forEach((s) => {
+      const L = s.ax === 'z' ? [1.3, 2.4] : [2.4, 1.3]
+      table.push({ p: [s.x, 0.55, s.z], s: [L[0], 0.8, L[1]] })
+      goods.push({ p: [s.x, 1.05, s.z], s: [L[0] - 0.2, 0.28, L[1] - 0.2], c: s.goods })
+      tarp.push({ p: [s.x, 2.45, s.z], s: [L[0] + 0.7, 0.07, L[1] + 0.7], c: s.tarp })
+      for (const a of [-1, 1]) for (const b of [-1, 1]) poles.push({ p: [s.x + a * (L[0] / 2 + 0.25), 1.3, s.z + b * (L[1] / 2 + 0.25)], s: [0.07, 2.5, 0.07] })
+    })
+    const cab = []
+    wires.forEach((w) => {
+      const dx = w.x2 - w.x1, dz = w.z2 - w.z1, len = Math.hypot(dx, dz), r = -Math.atan2(dz, dx)
+      for (const y of [5.75, 5.5, 5.25]) cab.push({ p: [(w.x1 + w.x2) / 2, y, (w.z1 + w.z2) / 2], s: [len, 0.035, 0.035], r })
+    })
+    return { table, goods, tarp, poles, cab }
+  }, [])
+  return (
+    <>
+      <Inst geo={BOX} mat={mat('#8a6a4a')} items={d.table} shadow />
+      <Inst geo={BOX} mat={mat('#ffffff')} items={d.goods} />
+      <Inst geo={BOX} mat={mat('#ffffff')} items={d.tarp} shadow />
+      <Inst geo={BOX} mat={mat('#555a60')} items={d.poles} />
+      <Inst geo={BOX} mat={mat('#1c1f24')} items={d.cab} />
+    </>
+  )
+}
+
 function Roads() {
   const dashes = useMemo(() => {
     const out = []
     ROADS.forEach((r) => {
-      for (let a = -166; a <= 166; a += 7) {
+      for (let a = -256; a <= 256; a += 7) {
         if (ROADS.some((q) => Math.abs(a - q) < RW / 2 + 2)) continue
         out.push({ p: [a, 0.06, r], s: [3, 1, 0.22] })
         out.push({ p: [r, 0.06, a], s: [0.22, 1, 3] })
@@ -79,8 +108,8 @@ function Roads() {
     <>
       {ROADS.map((r) => (
         <group key={r}>
-          <mesh geometry={PLANE} material={asphalt} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, r]} scale={[350, RW, 1]} receiveShadow />
-          <mesh geometry={PLANE} material={asphalt} rotation={[-Math.PI / 2, 0, 0]} position={[r, 0.035, 0]} scale={[RW, 350, 1]} receiveShadow />
+          <mesh geometry={PLANE} material={asphalt} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, r]} scale={[560, RW, 1]} receiveShadow />
+          <mesh geometry={PLANE} material={asphalt} rotation={[-Math.PI / 2, 0, 0]} position={[r, 0.035, 0]} scale={[RW, 560, 1]} receiveShadow />
         </group>
       ))}
       <Inst geo={BOX} mat={mat('#ffd23f')} items={dashes} />
@@ -120,6 +149,7 @@ export default function City() {
       <Inst geo={BOX} mat={mat('#ffffff')} items={signs.awnings} shadow />
       <Inst geo={CYL} mat={mat('#6b4a2b')} items={trunks} shadow />
       <Inst geo={ICO} mat={mat('#ffffff')} items={crowns} shadow />
+      <StreetLife />
       <Landmarks />
       <Inst geo={BOX} mat={mat('#4a4f57')} items={poles} />
       <Inst geo={BOX} mat={mat('#fff1b0', { emissive: '#ffd966', emissiveIntensity: 1.6 })} items={heads} />

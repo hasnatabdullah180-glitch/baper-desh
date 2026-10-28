@@ -1,6 +1,6 @@
-import { hud, toast, addXp, addChaos, addDamage, news, recordBest, saveNow, bn } from './store'
+import { hud, toast, addXp, addChaos, addDamage, news, recordBest, saveNow, bn, memeLine } from './store'
 import { ROADS, BX, resolve, gY, PADS, lamps, trees } from './world'
-import { sfx, siren, say, crowdLoop } from './audio'
+import { sfx, siren, crowdLoop, engine } from './audio'
 
 const rnd = (a, b) => a + Math.random() * (b - a)
 const pick = (a) => a[Math.floor(Math.random() * a.length)]
@@ -13,6 +13,7 @@ export const G = {
   mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null,
   vehicles: [], npcs: [], cdNpc: 0,
   hp: 100, mob: 0, crowd: [], crowdCd: 0, crowdAge: 0, crowdHit: 0, lastHurt: 0, punch: false, punchCd: 0, punchT: 0, joy: { x: 0, y: 0 }, fx: [], cng: null,
+  ride: null, lookT: 0, horn: false,
 }
 
 export const MISSIONS = {
@@ -26,7 +27,15 @@ const RACE = [[80, 0], [80, 80], [0, 80], [0, 0], [80, 0], [80, 40]]
 const HIDE = [-80, -80]
 export const HIDEOUT = HIDE
 
-const VT = { car: { hl: 2.2, hw: 1.0 }, bus: { hl: 4.7, hw: 1.4 }, rick: { hl: 1.5, hw: 0.7 }, ezy: { hl: 1.4, hw: 0.75 }, bike: { hl: 1.0, hw: 0.45 } }
+// drivable vehicle specs: top speed, reverse, acceleration, steering rate, half length/width, chase-cam distance
+const SPEC = {
+  car: { label: 'গাড়ি', max: 24, rev: -8, acc: 15, turn: 2.1, hl: 2.2, hw: 1.0, cam: 8.5 },
+  bus: { label: 'BRTC বাস', max: 16, rev: -5, acc: 7, turn: 1.25, hl: 4.7, hw: 1.4, cam: 13, hide: true },
+  ezy: { label: 'ইজি-বাইক', max: 15, rev: -5, acc: 10, turn: 2.5, hl: 1.4, hw: 0.75, cam: 7.5 },
+  bike: { label: 'মোটরবাইক', max: 30, rev: -4, acc: 18, turn: 3.0, hl: 1.0, hw: 0.45, cam: 6.5 },
+  rick: { label: 'রিকশা', max: 9, rev: -3, acc: 5, turn: 2.3, hl: 1.5, hw: 0.7, cam: 7 },
+}
+const VT = SPEC
 const CARCOL = ['#e63946', '#f4a261', '#2a9d8f', '#264653', '#e9c46a', '#8d99ae', '#fb8500', '#6a4c93', '#f1faee']
 const BUSCOL = ['#d62828', '#d62828', '#c1121f'] // BRTC red
 const EZYCOL = ['#1b9e5a', '#1b9e5a', '#16a34a'] // green battery auto
@@ -44,10 +53,10 @@ function initWorld() {
         const off = ax === 'x' ? (dir > 0 ? r - 3.2 : r + 3.2) : dir > 0 ? r + 3.2 : r - 3.2
         const speed = rnd(5, 8.5), ph = Math.random() * 113
         for (let k = 0; k < 3; k++) {
-          const type = ['car', 'bus', 'ezy', 'car', 'bike', 'bus', 'rick', 'bike'][(n + k) % 8]
+          const type = ['rick', 'car', 'ezy', 'rick', 'bus', 'bike', 'rick', 'ezy', 'car', 'rick'][(n + k) % 10]
           const sp = VT[type]
           G.vehicles.push({
-            ax, dir, off, speed, type, s: -170 + ((ph + k * 113) % 340),
+            ax, dir, off, speed, type, s: -255 + ((ph + k * 173) % 510), parked: false, player: false, parkT: 0,
             color: type === 'bus' ? pick(BUSCOL) : type === 'rick' ? pick(RICKCOL) : type === 'ezy' ? pick(EZYCOL) : type === 'bike' ? pick(BIKECOL) : pick(CARCOL),
             hx: ax === 'x' ? sp.hl : sp.hw, hz: ax === 'x' ? sp.hw : sp.hl,
             x: 0, z: 0, ry: 0, vx: ax === 'x' ? dir * speed : 0, vz: ax === 'z' ? dir * speed : 0, cd: 0,
@@ -59,10 +68,10 @@ function initWorld() {
   })
   G.vehicles.forEach((v) => placeVeh(v))
 
-  for (let k = 0; k < 18; k++) {
+  for (let k = 0; k < 34; k++) {
     let i, j, side
-    do { i = Math.floor(Math.random() * 4); j = Math.floor(Math.random() * 4); side = Math.floor(Math.random() * 4) }
-    while ((side === 0 && i === 0) || (side === 1 && i === 3) || (side === 2 && j === 0) || (side === 3 && j === 3))
+    do { i = Math.floor(Math.random() * BX.length); j = Math.floor(Math.random() * BX.length); side = Math.floor(Math.random() * 4) }
+    while ((side === 0 && i === 0) || (side === 1 && i === BX.length - 1) || (side === 2 && j === 0) || (side === 3 && j === BX.length - 1))
     const [x0, x1] = BX[i], [z0, z1] = BX[j]
     const ax = side < 2 ? 'z' : 'x'
     const c = [x0 + 1.6, x1 - 1.6, z0 + 1.6, z1 - 1.6][side]
@@ -85,13 +94,15 @@ initWorld()
 
 // ---------- game flow ----------
 export function resetGame() {
-  Object.assign(G, { x: 40, y: 0.12, z: 46, vx: 0, vz: 0, vy: 0, grounded: true, face: Math.PI, spd: 0, yaw: 0, pitch: 0.38, stun: 0, mode: 'foot', heat: 0, wantedShown: 0, mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null, hp: 100, mob: 0, crowd: [], crowdCd: 0, cng: null, punchT: 0, fx: [] })
-  siren(false); crowdLoop(false)
-  hud.set({ hp: 100, mob: 0, news: null, wanted: 0, mission: null, obj: '', left: 0, prompt: '', result: null, toasts: [] })
+  Object.assign(G, { x: 40, y: 0.12, z: 46, vx: 0, vz: 0, vy: 0, grounded: true, face: Math.PI, spd: 0, yaw: 0, pitch: 0.38, stun: 0, mode: 'foot', heat: 0, wantedShown: 0, mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null, hp: 100, mob: 0, crowd: [], crowdCd: 0, cng: null, punchT: 0, fx: [], ride: null })
+  G.vehicles.forEach((v) => { if (v.player || v.parked) respawnVeh(v, rnd(-250, 250)) })
+  siren(false); crowdLoop(false); engine(null)
+  hud.set({ ride: null, speed: 0, meme: null, hp: 100, mob: 0, news: null, wanted: 0, mission: null, obj: '', left: 0, prompt: '', result: null, toasts: [] })
 }
 
 export function startMission(id) {
   const m = MISSIONS[id]
+  if (id === 'race' && G.ride) leaveRide()
   G.mission = { id, t: 0, left: m.time, cd: 0, lastObj: '' }
   G.cpi = 0; G.stun = 0; G.vx = G.vz = 0
   if (id === 'boss') G.cps = BOSS
@@ -116,10 +127,10 @@ export function startMission(id) {
 
 function end(ok, msg, xp, chaos) {
   const m = G.mission
-  siren(false); sfx(ok ? 'win' : 'fail')
+  siren(false); sfx(ok ? 'win' : 'fail'); memeLine(ok ? 'win' : 'fail', true)
   if (ok) { addXp(xp); if (chaos) addChaos(chaos); recordBest(m.id, m.t) } else addXp(10)
   hud.set({ result: { ok, id: m.id, title: MISSIONS[m.id].title, msg, xp: ok ? Math.round(xp) : 10, chaos: ok ? chaos : 0, time: m.t }, mission: null, left: 0, obj: '', wanted: 0, prompt: '' })
-  Object.assign(G, { mission: null, cps: [], cops: [], rivals: [], cng: null, mode: 'foot', heat: 0, wantedShown: 0, stun: 0, target: null })
+  Object.assign(G, { mission: null, cps: [], cops: [], rivals: [], cng: null, mode: G.ride ? 'ride' : 'foot', heat: 0, wantedShown: 0, stun: 0, target: null })
   G.noPauseUntil = performance.now() + 500 // ignore the unlock event this triggers
   document.exitPointerLock?.()
 }
@@ -133,15 +144,21 @@ export function step(dt) {
   dt = Math.min(dt, 0.05)
   G.t += dt
   vehicles(dt); npcs(dt); player(dt); crowd(dt); mission(dt); wanted(dt); syncMeters()
-  G.jump = false; G.interact = false; G.punch = false
+  G.jump = false; G.interact = false; G.punch = false; G.horn = false
 }
 
 function vehicles(dt) {
   for (const v of G.vehicles) {
+    if (v.player) continue
+    if (v.parked) { // left behind by the player: a roadblock for a while, then back into circulation
+      v.cd -= dt; v.parkT += dt
+      if (v.parkT > 40 && Math.hypot(v.x - G.x, v.z - G.z) > 70) respawnVeh(v, v.dir > 0 ? -255 : 255)
+      continue
+    }
     if (v.halt > 0) { v.halt -= dt; v.cd -= dt; continue } // punched: stuck in a jam
     v.s += v.dir * v.speed * dt
-    if (v.s > 170) v.s -= 340
-    else if (v.s < -170) v.s += 340
+    if (v.s > 258) v.s -= 516
+    else if (v.s < -258) v.s += 516
     v.cd -= dt
     placeVeh(v)
   }
@@ -162,6 +179,12 @@ function npcs(dt) {
 const NPC_LINES = ['আরে ভাই কী করেন!', 'পুলিশ ডাকমু কিন্তু!', 'চাচা, এইডা কী হইল!', 'ওরে বাবা! সরেন সরেন!', 'মিয়া ভাই, আস্তে!', 'এই ছেলে, বাপের দেশে এমন করে?']
 
 function player(dt) {
+  if (G.ride) {
+    drive(dt)
+    G.punchCd -= dt; G.punchT = Math.max(0, G.punchT - dt)
+    interact()
+    return
+  }
   const k = G.keys
   const rick = G.mode === 'rick'
   let ix = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0)
@@ -185,18 +208,19 @@ function player(dt) {
 
   // vehicles
   for (const v of G.vehicles) {
+    if (v.player) continue
     const ddx = G.x - v.x, ddz = G.z - v.z
     const px = v.hx + pr - Math.abs(ddx), pz = v.hz + pr - Math.abs(ddz)
     if (px > 0 && pz > 0 && G.y < 2) {
       if (px < pz) G.x += Math.sign(ddx || 1) * px; else G.z += Math.sign(ddz || 1) * pz
-      if (G.stun <= 0 && v.cd <= 0) {
+      if (!v.parked && G.stun <= 0 && v.cd <= 0) {
         v.cd = 1.5
         if (rick) { G.vx *= -0.3; G.vz *= -0.3; G.stun = 0.3 } else { G.vx = v.vx * 0.7; G.vz = v.vz * 0.7; G.stun = 0.8 }
         addHeat(0.6)
         toast(pick(['ধুর! গাড়ি ধাক্কা দিল!', 'আরে! রাস্তা কি তোর বাপের?', 'উফ! হর্ন শুনিস না নাকি?']), 'bad')
         if (G.mission && G.mission.id !== 'race') G.mission.left -= 2
       }
-    } else if (v.cd <= 0 && G.spd > 2.5) {
+    } else if (!v.parked && v.cd <= 0 && G.spd > 2.5) {
       const ox = Math.max(Math.abs(ddx) - v.hx, 0), oz = Math.max(Math.abs(ddz) - v.hz, 0)
       if (Math.hypot(ox, oz) < pr + 0.8) { v.cd = 2.5; sfx(v.type === 'rick' ? 'bell' : v.type === 'bus' ? 'horn' : 'honk'); addChaos(20, pick(['বাপরে বাপ! অল্পের জন্য বাঁচলাম!', 'নিয়ার মিস! কলিজা ঠান্ডা!', 'ঢাকার রাস্তায় এটাই নিয়ম!'])) }
     }
@@ -217,16 +241,183 @@ function player(dt) {
   G.spd = Math.hypot(G.vx, G.vz)
   if (G.spd > 0.5) G.face = angLerp(G.face, Math.atan2(G.vx, G.vz), 1 - Math.exp(-12 * dt))
 
-  // interaction prompt
-  let prompt = ''
-  let pad = null
+  interact()
+}
+
+// ================= driving =================
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+let lastScreech = 0
+
+function respawnVeh(v, s) {
+  const sp = SPEC[v.type]
+  v.player = false; v.parked = false; v.parkT = 0; v.halt = 0
+  v.hx = v.ax === 'x' ? sp.hl : sp.hw; v.hz = v.ax === 'x' ? sp.hw : sp.hl
+  v.s = s; placeVeh(v)
+}
+
+function nearVehicle() {
+  let best = null, bd = 2.6
+  for (const v of G.vehicles) {
+    if (v.player) continue
+    const ox = Math.max(Math.abs(G.x - v.x) - v.hx, 0), oz = Math.max(Math.abs(G.z - v.z) - v.hz, 0)
+    const d = Math.hypot(ox, oz)
+    if (d < bd) { bd = d; best = v }
+  }
+  return best
+}
+
+function enterRide(v) {
+  const sp = SPEC[v.type]
+  v.player = true; v.parked = false
+  G.ride = { v, type: v.type, spec: sp, sp: v.halt > 0 ? 0 : v.speed, steer: 0, crashCd: 0, hornCd: 0, cngCd: 0 }
+  G.x = v.x; G.z = v.z; G.face = v.ry; G.y = 0.12; G.vx = G.vz = 0; G.vy = 0; G.grounded = true; G.mode = 'ride'
+  G.yaw = G.face + Math.PI; G.lookT = -9
+  hud.set({ ride: { label: sp.label }, prompt: '' })
+  memeLine('enter', true)
+}
+
+function leaveRide() {
+  const r = G.ride
+  if (!r) return
+  const v = r.v, sp = r.spec
+  v.player = false; v.parked = true; v.parkT = 0; v.halt = 0
+  const sn = Math.abs(Math.sin(G.face)), cs = Math.abs(Math.cos(G.face)) // axis-aligned bounds of the rotated vehicle
+  v.hx = sn * sp.hl + cs * sp.hw; v.hz = cs * sp.hl + sn * sp.hw
+  v.x = G.x; v.z = G.z; v.ry = G.face
+  const off = sp.hw + 1.2 // step out on the left
+  G.x += Math.cos(G.face) * off; G.z -= Math.sin(G.face) * off
+  G.ride = null; G.mode = G.mission?.id === 'race' ? 'rick' : 'foot'
+  G.vx = G.vz = 0; G.spd = 0
+  resolve(G, 0.45)
+  engine(null)
+  hud.set({ ride: null, speed: 0 })
+  memeLine('exit')
+}
+
+function horn() {
+  const r = G.ride
+  if (!r || r.hornCd > 0) return
+  r.hornCd = 0.45
+  sfx(r.type === 'bus' ? 'horn' : r.type === 'rick' || r.type === 'ezy' ? 'bell' : 'honk')
+  addChaos(2)
+  for (const p of G.npcs) if (p.scare <= 0 && Math.hypot(p.x - G.x, p.z - G.z) < 14) p.scare = 2.5 // pedestrians scatter
+  memeLine('honk')
+}
+
+function cngHit(r, ram) {
+  r.hp--; r.halt = ram ? 1.2 : 0.9; r.speed = Math.max(4.2, r.speed - 0.5)
+  fx(pick(POW), r.x, 2.6, r.z, '#ff9f1c'); sfx('punch'); setTimeout(() => sfx('clang'), 70)
+  addDamage(rint(4000, 12000)); addChaos(20); toast(pick(CNG_LINES), 'chaos'); memeLine('cng')
+  if (r.hp <= 0) {
+    sfx('crash')
+    news('অটোওয়ালা ধরা!', 'যাত্রী বললেন: “ভাড়া কিন্তু মিটারে!”', true)
+    end(true, 'অটো ধরা পড়ছে! ভাড়া এখন মিটারে!', 280 + Math.max(0, G.mission.left) * 2, 150)
+  }
+}
+
+function drive(dt) {
+  const r = G.ride, sp = r.spec, k = G.keys
+  let thr = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0)
+  let st = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0)
+  if (Math.abs(G.joy.y) > 0.15) thr = clamp(thr + G.joy.y, -1, 1)
+  if (Math.abs(G.joy.x) > 0.15) st = clamp(st + G.joy.x, -1, 1)
+  if (G.stun > 0) { G.stun -= dt; thr = st = 0 }
+  if (G.mission && G.mission.cd > 0) thr = st = 0
+  r.hornCd -= dt; r.crashCd -= dt; r.cngCd -= dt
+  if (G.punch || G.horn) horn()
+
+  const boost = (k.ShiftLeft || k.ShiftRight) && r.type !== 'rick' && thr > 0, brake = !!k.Space
+  const maxV = sp.max * (boost ? 1.35 : 1)
+  if (thr > 0) r.sp += (r.sp < 0 ? sp.acc * 2.5 : sp.acc * (boost ? 1.6 : 1)) * thr * dt
+  else if (thr < 0) r.sp -= (r.sp > 0.5 ? sp.acc * 2 : sp.acc * 0.6) * -thr * dt
+  else r.sp -= Math.sign(r.sp) * Math.min(Math.abs(r.sp), 4 * dt)
+  if (brake) r.sp -= Math.sign(r.sp) * Math.min(Math.abs(r.sp), 28 * dt)
+  r.sp = clamp(r.sp, sp.rev, maxV)
+
+  r.steer += (st - r.steer) * (1 - Math.exp(-9 * dt))
+  const drift = brake && Math.abs(r.sp) > 6
+  G.face -= r.steer * sp.turn * Math.min(1, Math.abs(r.sp) / 5) * (r.sp >= 0 ? 1 : -1) * (drift ? 1.6 : 1) * dt
+  if (drift && G.t - lastScreech > 0.7) { lastScreech = G.t; sfx('screech') }
+
+  const fx0 = Math.sin(G.face), fz0 = Math.cos(G.face)
+  G.x += fx0 * r.sp * dt; G.z += fz0 * r.sp * dt
+  const hw = sp.hw, offs = [sp.hl - hw, 0, -(sp.hl - hw)] // three circles along the body
+  const imp = Math.abs(r.sp)
+  let ip = 0
+  for (const o of offs) { // buildings, trees, pillars…
+    const pt = { x: G.x + fx0 * o, z: G.z + fz0 * o }, bx = pt.x, bz = pt.z
+    resolve(pt, hw)
+    G.x += pt.x - bx; G.z += pt.z - bz; ip += Math.hypot(pt.x - bx, pt.z - bz)
+  }
+  for (const v of G.vehicles) { // other traffic and parked vehicles
+    if (v === r.v) continue
+    let hit = false
+    for (const o of offs) {
+      const cx = G.x + fx0 * o, cz = G.z + fz0 * o
+      const qx = clamp(cx, v.x - v.hx, v.x + v.hx), qz = clamp(cz, v.z - v.hz, v.z + v.hz)
+      let dx = cx - qx, dz = cz - qz
+      const d2 = dx * dx + dz * dz
+      if (d2 >= hw * hw) continue
+      if (d2 < 1e-6) { dx = cx - v.x; dz = cz - v.z }
+      const d = Math.hypot(dx, dz) || 1, push = d2 < 1e-6 ? hw + 0.3 : hw - Math.sqrt(d2)
+      G.x += (dx / d) * push; G.z += (dz / d) * push; ip += push; hit = true
+    }
+    if (hit && v.cd <= 0) {
+      v.cd = 1.4
+      if (imp > 3) {
+        v.halt = v.parked ? 0 : 1.4
+        sfx('crash'); addDamage(rint(8000, 25000)); addHeat(0.5); G.mob += 10
+        toast(pick(['ঠুসস! গাড়ি-গাড়ি খেলা!', 'আরে! লাইসেন্স আছে তো?', 'হর্ন নাই নাকি রে!']), 'bad')
+        memeLine('crash')
+      }
+    } else if (!hit && v.cd <= 0 && imp > 8) {
+      const ox = Math.max(Math.abs(G.x - v.x) - v.hx - hw, 0), oz = Math.max(Math.abs(G.z - v.z) - v.hz - hw, 0)
+      if (Math.hypot(ox, oz) < 0.8) { v.cd = 2.5; addChaos(20, 'নিয়ার মিস! কলিজা ঠান্ডা!'); memeLine('nearmiss') }
+    }
+  }
+  if (ip > 0.01) {
+    r.sp *= 1 - Math.min(0.5, ip * 1.5)
+    if (imp > 9 && r.crashCd <= 0) { r.crashCd = 1.2; sfx('crash'); addDamage(rint(6000, 20000)); addHeat(0.3); G.mob += 6; memeLine('crash') }
+  }
+
+  // run over pedestrians
+  const fxp = G.x + fx0 * (sp.hl - 0.3), fzp = G.z + fz0 * (sp.hl - 0.3)
+  if (imp > 3) for (const p of G.npcs) {
+    if (p.down > 0.3 || Math.hypot(p.x - fxp, p.z - fzp) > hw + 0.9) continue
+    p.down = 2.2; p.scare = 4
+    fx(pick(POW), p.x, 1.9, p.z)
+    sfx('punch'); setTimeout(() => sfx('ouch'), 90)
+    addDamage(rint(1500, 4000)); addChaos(15); G.mob += 28; addHeat(0.7)
+    memeLine('runover')
+  }
+  // ram the runaway CNG
+  if (G.cng && r.cngCd <= 0 && imp > 5 && Math.hypot(G.cng.x - fxp, G.cng.z - fzp) < 2.4) { r.cngCd = 0.9; cngHit(G.cng, true); r.sp *= -0.3 }
+
+  r.v.x = G.x; r.v.z = G.z; r.v.ry = G.face
+  G.y = 0.12; G.vy = 0; G.grounded = true
+  G.vx = fx0 * r.sp; G.vz = fz0 * r.sp; G.spd = Math.abs(r.sp)
+  if (G.t - G.lookT > 1.4) G.yaw = angLerp(G.yaw, G.face + Math.PI, 1 - Math.exp(-3 * dt)) // chase camera swings behind
+  engine(G.spd / sp.max, r.type)
+  const kmh = Math.round(G.spd * 3.6)
+  if (kmh !== hud.get().speed) hud.set({ speed: kmh })
+}
+
+// ================= interaction prompt / E key =================
+function interact() {
+  const ride = G.ride
+  let pad = null, car = null, npc = null
   if (!G.mission) pad = PADS.find((p) => Math.hypot(G.x - p.x, G.z - p.z) < 3.4)
-  const npc = G.npcs.find((p) => Math.hypot(G.x - p.x, G.z - p.z) < 3.5)
+  if (!ride) { car = nearVehicle(); npc = G.npcs.find((p) => Math.hypot(G.x - p.x, G.z - p.z) < 3.5) }
+  let prompt = ''
   if (pad) prompt = `E চাপুন — ${pad.label} শুরু করো`
+  else if (ride) prompt = 'E চাপুন — গাড়ি থেকে নামো · H হর্ন'
+  else if (car) prompt = `E চাপুন — ${SPEC[car.type].label} চালাও`
   else if (npc && G.mode === 'foot') prompt = 'E চাপুন — জোরে ধমক দাও!'
   if (prompt !== hud.get().prompt) hud.set({ prompt })
   if (G.interact) {
     if (pad) startMission(pad.id)
+    else if (ride) leaveRide()
+    else if (car) enterRide(car)
     else if (npc && G.mode === 'foot' && G.cdNpc <= 0) {
       G.cdNpc = 0.6; npc.scare = 3; addHeat(0.35)
       addChaos(10, pick(NPC_LINES))
@@ -335,7 +526,7 @@ function wanted(dt) {
     if (w === 5 && G.wantedShown < 5) news('ব্রেকিং: দেশজুড়ে হাই-অ্যালার্ট!', 'পুলিশ খুঁজছে রাস্তার তাণ্ডবকারী যুবককে', true)
     if (w > G.wantedShown) toast(`ওয়ান্টেড লেভেল ${bn(w)} ★ পুলিশ মামা নজর রাখছে!`, 'bad')
     G.wantedShown = w; hud.set({ wanted: w })
-    if (w >= 4 && !G.mission) { G.mode = 'foot'; startMission('chase') }
+    if (w >= 4 && !G.mission) { if (!G.ride) G.mode = 'foot'; startMission('chase') }
   }
 }
 
@@ -355,6 +546,7 @@ function doPunch() {
   for (const c of G.crowd) if (c.down <= 0) cand(Math.hypot(c.x - G.x, c.z - G.z), 'mob', c, 2.1)
   for (const p of G.npcs) if (!(p.down > 0.3)) cand(Math.hypot(p.x - G.x, p.z - G.z), 'npc', p, 2.1)
   for (const v of G.vehicles) {
+    if (v.player) continue
     const ox = Math.max(Math.abs(G.x - v.x) - v.hx, 0), oz = Math.max(Math.abs(G.z - v.z) - v.hz, 0)
     cand(Math.hypot(ox, oz), 'veh', v, 1.5)
   }
@@ -370,7 +562,7 @@ function doPunch() {
     fx(pick(POW), tx, 1.9, tz)
     sfx('punch'); setTimeout(() => sfx(Math.random() < 0.5 ? 'ouch' : 'scream'), 90)
     addDamage(rint(500, 2500)); addChaos(12, Math.random() < 0.45 ? pick(NPC_LINES) : '')
-    say(pick(NPC_LINES))
+    memeLine(Math.random() < 0.6 ? 'punch' : 'hurt')
     G.mob += 22; addHeat(0.5)
     for (const o of G.npcs) if (o !== r && Math.hypot(o.x - tx, o.z - tz) < 10) { o.scare = 3; G.mob += 3 } // witnesses panic
   } else if (k === 'mob') {
@@ -388,21 +580,14 @@ function doPunch() {
   } else if (k === 'tree') {
     fx('ফটাস!', tx, 3.2, tz, '#7ef2a0'); sfx('slap'); addDamage(800); addChaos(3); G.mob += 1
   } else if (k === 'cng') {
-    r.hp--; r.halt = 0.9; r.speed = Math.max(4.2, r.speed - 0.5)
-    fx(pick(POW), tx, 2.6, tz, '#ff9f1c'); sfx('punch'); setTimeout(() => sfx('clang'), 70)
-    addDamage(rint(4000, 12000)); addChaos(20); toast(pick(CNG_LINES), 'chaos'); say(pick(CNG_LINES))
-    if (r.hp <= 0) {
-      sfx('crash')
-      news('অটোওয়ালা ধরা!', 'যাত্রী বললেন: “ভাড়া কিন্তু মিটারে!”', true)
-      end(true, 'অটো ধরা পড়ছে! ভাড়া এখন মিটারে!', 280 + Math.max(0, G.mission.left) * 2, 150)
-    }
+    cngHit(r)
   }
 }
 
 // ---- runaway CNG auto-rickshaw: flees along the 3x3 road grid, away from the player ----
 function nextNode(c) {
   const [fx0, fz0] = c.to
-  let opts = [[80, 0], [-80, 0], [0, 80], [0, -80]].map(([dx, dz]) => [fx0 + dx, fz0 + dz]).filter(([x, z]) => Math.abs(x) <= 80 && Math.abs(z) <= 80)
+  let opts = [[80, 0], [-80, 0], [0, 80], [0, -80]].map(([dx, dz]) => [fx0 + dx, fz0 + dz]).filter(([x, z]) => Math.abs(x) <= 160 && Math.abs(z) <= 160)
   const back = opts.filter(([x, z]) => !(x === c.from[0] && z === c.from[1]))
   if (back.length) opts = back
   let bestN = opts[0], bs = -1
@@ -449,7 +634,11 @@ function crowd(dt) {
     resolve(c, 0.5)
     c.moving = Math.hypot(c.x - ox, c.z - oz) > 0.01
     c.ry = angLerp(c.ry, Math.atan2(dx, dz), 1 - Math.exp(-10 * dt))
-    if (d < 1.5 && G.crowdHit <= 0 && G.stun <= 0.15) {
+    if (G.ride && Math.abs(G.ride.sp) > 4 && d < 2.6) { // run them over!
+      c.down = 2; sfx('punch'); fx(pick(POW), c.x, 1.9, c.z, '#ff7b7b'); addChaos(25); addDamage(rint(800, 2000)); memeLine('runover')
+      continue
+    }
+    if (d < (G.ride ? 2.2 : 1.5) && G.crowdHit <= 0 && G.stun <= 0.15) {
       G.crowdHit = 0.55; G.hp -= 6; G.stun = 0.25; G.lastHurt = G.t
       G.vx = (dx / (d || 1)) * 6; G.vz = (dz / (d || 1)) * 6
       sfx('slap'); sfx('ouch'); fx(pick(POW), G.x, 2, G.z, '#ff7b7b')
@@ -476,6 +665,7 @@ function spawnCrowd() {
   news('ব্রেকিং নিউজ: তাণ্ডবে ক্ষুব্ধ জনতা!', 'এলাকাবাসী ঘিরে ধরছে অজ্ঞাতনামা এক যুবককে')
 }
 function beaten() {
+  leaveRide()
   const had = !!G.mission
   news('গণপিটুনির শিকার তাণ্ডবকারী!', 'এলাকাবাসী: “বাপের দেশে এইসব চলবে না!”', true)
   sfx('fail')

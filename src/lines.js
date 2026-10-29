@@ -14,6 +14,18 @@ export const LINES = {
   honk: ['পিঁপিঁপিঁ! পথ ছাড়ুন!', 'হর্ন দিলাম, এবার সরেন!'],
   nearmiss: ['বাপরে! আরেকটু হইলেই শেষ!', 'কলিজা ঠান্ডা হয়ে গেল!'],
   cng: ['অটোওয়ালা ভাই, থামেন!', 'ভাড়া মিটারে, ভাই!'],
+  city: ['ভাই, এইটা ঢাকা শহর!', 'আরে ভাই, আস্তে চালান!'],
+  start: ['চাঁদা মিশন শুরু!', 'চল, মিশন শুরু!'],
+  siren: ['পুলিশ আসতেছে, দৌড় দেন!', 'থামেন! থামেন বলতেছি!', 'ধর ধর! পালায় যায়!'],
+  cop: ['ভাই, সিগন্যাল মানেন!', 'লাইসেন্স দেখান তো!', 'এইটা নো-পার্কিং জোন!', 'হুইসেল দিলাম, থামেন!'],
+  copgone: ['যাহ! পুলিশ ফেল!', 'হাওয়া হয়ে গেলাম!'],
+  busted: ['ধরা খাইলাম রে!', 'থানায় চা খাওয়াবেন নাকি?!'],
+  vendor: ['ভাই, আজকে বউনিই হয় নাই!', 'ভাই, লাইনে আসেন, লাইনে!', 'কলা নিবেন, কলা?'],
+  take: ['এই নেন ভাই, সালাম!', 'ঠিকাছে ভাই, দিয়া দিলাম!'],
+  more: ['এত্ত বেশি?! ব্যবসা লাটে উঠবে!', 'ভাই, আমার তো ছেলেমেয়ে আছে!'],
+  spare: ['ধন্যবাদ ভাই, আল্লাহ ভালা করুক!', 'আপনি আসল মানুষ!'],
+  threat: ['ভাই ভাই, মাইর দিয়েন না!', 'ওরে বাবারে!'],
+  lvlup: ['বাপের দেশ লেভেল আপ!'],
 }
 // which meme sound goes with which line type (null = the game already plays its own sound)
-export const MEME_SFX = { punch: 'boom', hurt: 'bruh', enter: 'airhorn', exit: 'sparkle', crash: 'boom', runover: 'scratch', win: 'airhorn', fail: null, level: 'airhorn', mob: 'scratch', honk: null, nearmiss: 'bruh', cng: 'boom' }
+export const MEME_SFX = { punch: 'boom', hurt: 'bruh', enter: 'airhorn', exit: 'sparkle', crash: 'boom', runover: 'scratch', win: 'airhorn', fail: null, level: 'airhorn', mob: 'scratch', honk: null, nearmiss: 'bruh', cng: 'boom', city: null, start: 'airhorn', siren: null, cop: 'whistle', copgone: 'sparkle', busted: 'violin', vendor: null, take: 'cash', more: 'bruh', spare: 'sparkle', threat: 'scratch', lvlup: 'airhorn' }

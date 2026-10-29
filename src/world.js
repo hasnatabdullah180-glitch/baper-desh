@@ -39,6 +39,7 @@ export const PADS = [
   { id: 'race', x: 53, z: 40, color: '#ffb703', label: 'রিকশা রেসার' },
   { id: 'chase', x: 40, z: 58, color: '#3a86ff', label: 'পুলিশ চেজ' },
   { id: 'cng', x: 40, z: 22, color: '#ff7b00', label: 'অটো ধর' },
+  { id: 'chanda', x: 60, z: 58, color: '#14b8a6', label: 'ফুটপাত চাঁদা কালেকশন' },
 ]
 export const FLAG = { x: 40, z: 40 }
 circles.push({ x: FLAG.x, z: FLAG.z, r: 6.6 }) // Shapla fountain
@@ -86,7 +87,7 @@ BX.forEach(([x0, x1], i) =>
         const off = sd.edge + inward * 3.4
         const sx = sd.ax === 'z' ? off : a, sz = sd.ax === 'z' ? a : off
         if (ROADS.some((r) => (sd.ax === 'z' ? Math.abs(a - r) : Math.abs(a - r)) < RW / 2 + 5)) continue
-        stalls.push({ x: sx, z: sz, ax: sd.ax, tarp: STALL_COL[Math.floor(rnd() * STALL_COL.length)], goods: GOODS[Math.floor(rnd() * GOODS.length)] })
+        stalls.push({ x: sx, z: sz, ax: sd.ax, inward, kind: stalls.length % 5, tarp: STALL_COL[Math.floor(rnd() * STALL_COL.length)], goods: GOODS[Math.floor(rnd() * GOODS.length)] })
         circles.push({ x: sx, z: sz, r: 1.0 })
       }
     })
@@ -114,7 +115,8 @@ BX.forEach(([x0, x1], i) =>
         if (b === 2 && j < NB - 1) faces.push('+z')
         const shop = faces.length > 0
         const center = a === 1 && b === 1
-        const h = shop ? 7 + rnd() * 6 : center ? 22 + rnd() * 20 : 12 + rnd() * 24
+        const h0 = shop ? 7 + rnd() * 6 : center ? 22 + rnd() * 20 : 12 + rnd() * 24
+        const h = h0 * (x > 0 && z > 0 ? 1.3 : x <= 0 && z > 0 ? 0.7 : 1) // Motijheel-style towers, Mirpur-style low-rise
         const r1 = rnd(), r2 = rnd(), r3 = rnd() // keep the seeded sequence identical whether or not we place the building
         if (bridgeBoxes.some((q) => x + w / 2 > q.x0 && x - w / 2 < q.x1 && z + d / 2 > q.z0 && z - d / 2 < q.z1)) continue // keep foot-bridge stairs clear
         buildings.push({
@@ -128,6 +130,24 @@ BX.forEach(([x0, x1], i) =>
   })
 )
 export const PALETTE = PAL
+
+// ---- traffic signals: 20 s cycle shared by all junctions (x-traffic green, then z-traffic) ----
+export const SIG = { t: 0 }
+export function signalState(ax) {
+  const p = SIG.t % 20
+  if (ax === 'x') return p < 8 ? 'g' : p < 10 ? 'y' : 'r'
+  return p < 10 ? 'r' : p < 18 ? 'g' : 'y'
+}
+// fictional, Dhaka-inspired districts (named "-style": not exact replicas)
+export const DISTRICTS = [
+  { id: 'plaza', name: 'শাপলা চত্বর', test: (x, z) => x > 7 && x < 73 && z > 7 && z < 73 },
+  { id: 'farm', name: 'ফার্মগেট–কারওয়ান বাজার ঘরানা', test: (x, z) => x <= 0 && z <= 0 },
+  { id: 'shahbag', name: 'শাহবাগ–টিএসসি ঘরানা', test: (x, z) => x > 0 && z <= 0 },
+  { id: 'mirpur', name: 'মিরপুর-ঘরানা আবাসিক এলাকা', test: (x, z) => x <= 0 && z > 0 },
+  { id: 'moti', name: 'মতিঝিল-ঘরানা বাণিজ্যিক এলাকা', test: () => true },
+]
+export const districtAt = (x, z) => DISTRICTS.find((d) => d.test(x, z))
+export const STALL_KINDS = [['ফলের দোকান', '#2b9348'], ['চা-পান-সিগারেট', '#b5651d'], ['জামা-কাপড়', '#7b2cbf'], ['ঝালমুড়ি · ফুচকা', '#e63946'], ['সবজি বাজার', '#2a9d8f']]
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 

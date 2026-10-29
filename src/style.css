@@ -153,3 +153,32 @@ body.touch .wanted span { font-size: 18px; } body.touch .tr { gap: 6px; } body.t
 .br { display: flex; flex-direction: column; align-items: flex-end; }
 body.touch .meme { top: 48%; } body.touch .speedo { padding: 3px 10px; } body.touch .speedo b { font-size: 22px; min-width: 40px; }
 body.touch .br { align-items: flex-start; }
+
+/* ---------- v4: chanda menu, audio panel, safe-area ---------- */
+.chmenu { position: fixed; z-index: 14; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, 92vw); max-height: 92vh; overflow: auto; padding: 14px; border-radius: 18px; background: rgba(13, 18, 36, .94); border: 3px solid #14b8a6; box-shadow: 0 10px 0 rgba(0, 0, 0, .3); display: flex; flex-direction: column; gap: 8px; pointer-events: auto; touch-action: manipulation; animation: pop .25s ease-out; }
+.chmenu small { opacity: .8; font-size: 13px; }
+.chline { font: 700 19px var(--bn); background: rgba(255, 255, 255, .08); border-radius: 12px; padding: 10px 12px; }
+.chopt { display: grid; grid-template-columns: 30px 1fr; grid-template-rows: auto auto; text-align: left; column-gap: 8px; padding: 9px 12px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .07); color: #fff; font-family: var(--bn); cursor: pointer; min-height: 52px; touch-action: manipulation; }
+.chopt kbd { grid-row: 1 / 3; align-self: center; text-align: center; }
+.chopt b { font-size: 18px; } .chopt span { font-size: 13px; opacity: .8; }
+.chopt:hover, .chopt:active { background: rgba(20, 184, 166, .35); border-color: #14b8a6; }
+.chopt.c1 { border-color: #ffb703; } .chopt.c2 { border-color: #06d6a0; } .chopt.c3 { border-color: #f42a41; }
+.chclose { margin-top: 2px; padding: 8px; border-radius: 10px; border: 0; background: transparent; color: #fff; opacity: .7; font-family: var(--bn); touch-action: manipulation; }
+.chmeter { position: absolute; top: 118px; left: 50%; transform: translateX(-50%); min-width: 260px; text-align: center; font: 700 16px var(--bn); }
+.chmeter.hot { border-color: #f42a41; animation: pulse .5s infinite alternate; }
+.chmeter .meter { margin-top: 4px; } .chmeter .meter > span { width: auto; white-space: nowrap; }
+.audpanel { display: inline-flex; flex-direction: column; gap: 6px; margin: 10px 0; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, .07); text-align: left; }
+.audrow { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.audrow span { width: 84px; }
+.audrow input[type=range] { flex: 1; min-width: 110px; accent-color: #ffd23f; touch-action: manipulation; }
+.audtog { min-width: 52px; padding: 4px 8px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08); color: #fff; font: 700 13px var(--bn); touch-action: manipulation; }
+.audtog.on { background: #14b8a6; border-color: #14b8a6; color: #04201c; }
+body.touch .chmeter { top: 96px; min-width: 200px; font-size: 13px; }
+/* notches / rounded corners / gesture bars */
+.hud .tl { top: max(14px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); }
+.hud .tr { top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
+.hud .bl { left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); }
+body.touch .hud .br { left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); }
+.tbtns { right: max(18px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
+body.touch .bc { bottom: max(110px, calc(env(safe-area-inset-bottom) + 100px)); }
+html, body { overflow: hidden; height: 100%; position: fixed; width: 100%; }

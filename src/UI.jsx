@@ -1,15 +1,15 @@
 import { useProgress } from '@react-three/drei'
 import Minimap from './Minimap.jsx'
 import Touch from './Touch.jsx'
-import { useHud, bn, levelOf, levelStart, toggleMute, taka } from './store'
-import { startGame, resumeGame, pauseGame, toMenu, dismissResult } from './controls'
+import { useHud, bn, levelOf, levelStart, toggleMute, taka, setAudioPref } from './store'
+import { startGame, resumeGame, pauseGame, toMenu, dismissResult, chooseChanda } from './controls'
 
 const CONTROLS = [
   ['W A S D', 'চলো'], ['মাউস', 'ক্যামেরা ঘোরাও'], ['Space', 'লাফ দাও'],
   ['Shift', 'দৌড়াও'], ['E', 'গাড়িতে ওঠো-নামো / মিশন'], ['F / ক্লিক', 'ঘুষি মারো'], ['H', 'হর্ন (গাড়িতে)'], ['Space', 'ব্রেক/ড্রিফট (গাড়িতে)'], ['P / Esc', 'বিরতি'], ['M', 'শব্দ চালু/বন্ধ'],
 ]
 const TOUCH_CONTROLS = [['বাঁ দিকে স্লাইড', 'চলো (পুরো ঠেললে দৌড়)'], ['ডান দিকে ড্র্যাগ', 'ক্যামেরা ঘোরাও'], ['✊ (গাড়িতে 📯)', 'ঘুষি মারো / হর্ন'], ['⤴', 'লাফ / গাড়িতে ব্রেক'], ['⚡', 'দৌড় / নাইট্রো'], ['E', 'গাড়িতে ওঠো-নামো / মিশন']]
-const NAMES = { boss: 'ট্রাফিক বস', race: 'রিকশা রেসার', chase: 'পুলিশ চেজ', cng: 'অটো ধর' }
+const NAMES = { boss: 'ট্রাফিক বস', race: 'রিকশা রেসার', chase: 'পুলিশ চেজ', cng: 'অটো ধর', chanda: 'ফুটপাত চাঁদা' }
 
 function Controls() {
   const touch = useHud((s) => s.touch)
@@ -34,6 +34,50 @@ function MuteBtn() {
   return <button className="pausebtn" onClick={toggleMute} title="M">{m ? '🔇' : '🔊'}</button>
 }
 
+function AudioPanel() {
+  const a = useHud((s) => s.aud)
+  const rows = [['music', 'mv', '🎵 গান'], ['sfx', 'sv', '🔊 ইফেক্ট'], ['voice', 'vv', '🗣 ভয়েস']]
+  return (
+    <div className="audpanel">
+      {rows.map(([on, vol, label]) => (
+        <label key={on} className="audrow">
+          <button type="button" className={'audtog' + (a[on] ? ' on' : '')} onClick={() => setAudioPref({ [on]: !a[on] })}>{a[on] ? 'চালু' : 'বন্ধ'}</button>
+          <span>{label}</span>
+          <input type="range" min="0" max="1" step="0.05" value={a[vol]} onChange={(e) => setAudioPref({ [vol]: +e.target.value })} aria-label={label} />
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function ChandaMenu() {
+  const m = useHud((s) => s.menu)
+  if (!m) return null
+  const OPT = [['চাঁদা নিন', '৳৫০০'], ['বেশি চান', '৳১,০০০ (ঝুঁকি!)'], ['ছেড়ে দিন', '+২৫ XP'], ['ধমক দিন', '৳৩০০ + পুলিশের নজর']]
+  return (
+    <div className="chmenu" onPointerDown={(e) => e.stopPropagation()}>
+      <small>{m.shop} · ভার্চুয়াল চাঁদা (শুধুই খেলা!)</small>
+      <div className="chline">বিক্রেতা: “{m.line}”</div>
+      {OPT.map(([t, sub], i) => (
+        <button key={i} className={'chopt c' + i} onClick={() => chooseChanda(i)}><kbd>{bn(i + 1)}</kbd><b>{t}</b><span>{sub}</span></button>
+      ))}
+      <button className="chclose" onClick={() => chooseChanda(-1)}>পরে আসব (Esc)</button>
+    </div>
+  )
+}
+
+function ChandaMeter() {
+  const cm = useHud((s) => s.cm)
+  const mission = useHud((s) => s.mission)
+  if (!cm || mission?.id !== 'chanda') return null
+  return (
+    <div className={'panel chmeter' + (cm.pct >= 70 ? ' hot' : '')}>
+      <div>💰 ভার্চুয়াল চাঁদা <b>{taka(cm.cash)}</b></div>
+      <div className="meter mob"><span>🚨 পুলিশ মামার সন্দেহ</span><div><i style={{ width: cm.pct + '%' }} /></div></div>
+    </div>
+  )
+}
+
 function Start() {
   const ready = useHud((s) => s.ready)
   const err = useHud((s) => s.modelError)
@@ -51,6 +95,7 @@ function Start() {
           {ready ? 'খেলা শুরু করো ▶  Start Game' : `শহর লোড হচ্ছে… ${bn(pct)}%`}
         </button>
         <div><button className="ghost" onClick={toggleMute}><MuteLabel /></button></div>
+        <AudioPanel />
         {err && <p className="warn">⚠ ক্যারেক্টার মডেল লোড হয়নি — সাময়িক ডামি মডেল দিয়ে চলছে।</p>}
       </div>
       <div className="panels">
@@ -69,7 +114,7 @@ function Start() {
         </section>
         <section className="panel">
           <h3>মিশন</h3>
-          <p className="tiny">প্লাজার জ্বলজ্বলে প্যাডে গিয়ে <kbd>E</kbd> চাপো।<br />ট্রাফিক বস · রিকশা রেসার · পুলিশ চেজ · অটো ধর<br />যেকোনো গাড়ির কাছে গিয়ে <kbd>E</kbd> চাপলেই চালাতে পারবে — বাস, ইজি-বাইক, মোটরবাইক, রিকশা!<br />বেশি তাণ্ডব করলে জনতা গণধোলাই দেবে!</p>
+          <p className="tiny">প্লাজার জ্বলজ্বলে প্যাডে গিয়ে <kbd>E</kbd> চাপো।<br />ট্রাফিক বস · রিকশা রেসার · পুলিশ চেজ · অটো ধর · ফুটপাত চাঁদা কালেকশন (ভার্চুয়াল, শুধুই মজা!)<br />যেকোনো গাড়ির কাছে গিয়ে <kbd>E</kbd> চাপলেই চালাতে পারবে — বাস, ইজি-বাইক, মোটরবাইক, রিকশা!<br />বেশি তাণ্ডব করলে জনতা গণধোলাই দেবে!</p>
         </section>
       </div>
     </div>
@@ -154,6 +199,8 @@ function Hud() {
         <div className="btns"><MuteBtn /><button className="pausebtn" onClick={pauseGame}>⏸ বিরতি</button></div>
       </div>
       <Meme />
+      <ChandaMeter />
+      <ChandaMenu />
       <div className="br"><Speedo /><Minimap /></div>
       <div className="bl panel"><Controls /></div>
       {touch && <Touch />}
@@ -173,6 +220,7 @@ function Pause() {
         <button className="big" onClick={resumeGame}>▶ চালিয়ে যাও (Resume)</button>
         <div><button className="ghost" onClick={toMenu}>মেনুতে ফিরে যাও</button></div>
         <div><button className="ghost" onClick={toggleMute}><MuteLabel /></button></div>
+        <AudioPanel />
         <Controls />
       </div>
     </div>

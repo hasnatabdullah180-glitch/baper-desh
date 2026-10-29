@@ -1,5 +1,7 @@
-import { hud, toast, addXp, addChaos, addDamage, news, recordBest, saveNow, bn, memeLine } from './store'
-import { ROADS, BX, resolve, gY, PADS, lamps, trees } from './world'
+import { hud, toast, addXp, addChaos, addDamage, news, recordBest, saveNow, bn, memeLine, taka } from './store'
+import { LINES } from './lines'
+import { Q } from './quality'
+import { ROADS, BX, resolve, gY, PADS, lamps, trees, SIG, signalState, districtAt, stalls } from './world'
 import { sfx, siren, crowdLoop, engine } from './audio'
 
 const rnd = (a, b) => a + Math.random() * (b - a)
@@ -14,12 +16,14 @@ export const G = {
   vehicles: [], npcs: [], cdNpc: 0,
   hp: 100, mob: 0, crowd: [], crowdCd: 0, crowdAge: 0, crowdHit: 0, lastHurt: 0, punch: false, punchCd: 0, punchT: 0, joy: { x: 0, y: 0 }, fx: [], cng: null,
   ride: null, lookT: 0, horn: false,
+  officers: [], vendors: [], copAlert: 0, bustCd: 0, menuOpen: false,
 }
 
 export const MISSIONS = {
   boss: { title: 'ট্রাফিক বস', time: 70, intro: 'সব চেকপয়েন্টে সময়মতো পৌঁছাও — রাস্তা এখন তোমার!' },
   race: { title: 'রিকশা রেসার', time: 60, intro: 'রিকশা নিয়ে সবাইকে হারিয়ে দাও!' },
   chase: { title: 'পুলিশ চেজ', time: 70, intro: 'পুলিশ মামা পিছনে! গোপন আড্ডায় পৌঁছাও!' },
+  chanda: { title: 'ফুটপাত চাঁদা কালেকশন', time: 150, intro: 'বাজারের ৫ দোকানে ঘুরে ভার্চুয়াল চাঁদা তোলো — তবে বেশি তাণ্ডব করলে পুলিশ মামা আসবে!' },
   cng: { title: 'অটো ধর', time: 100, intro: 'ভাড়া নিয়ে ঝগড়া! বদমেজাজি অটোওয়ালা পালাচ্ছে — দৌড়ে ধরে ঘুষি মেরে থামাও!' },
 }
 const BOSS = [[0, 40], [0, -40], [-40, 0], [-80, 40], [-40, 80], [40, 80]]
@@ -34,12 +38,16 @@ const SPEC = {
   ezy: { label: 'ইজি-বাইক', max: 15, rev: -5, acc: 10, turn: 2.5, hl: 1.4, hw: 0.75, cam: 7.5 },
   bike: { label: 'মোটরবাইক', max: 30, rev: -4, acc: 18, turn: 3.0, hl: 1.0, hw: 0.45, cam: 6.5 },
   rick: { label: 'রিকশা', max: 9, rev: -3, acc: 5, turn: 2.3, hl: 1.5, hw: 0.7, cam: 7 },
+  taxi: { label: 'হলুদ ট্যাক্সি', max: 23, rev: -8, acc: 14, turn: 2.1, hl: 2.2, hw: 1.0, cam: 8.5 },
+  van: { label: 'ডেলিভারি ভ্যান', max: 19, rev: -6, acc: 9, turn: 1.7, hl: 2.5, hw: 1.0, cam: 9.5 },
+  scooter: { label: 'স্কুটার', max: 24, rev: -4, acc: 14, turn: 3.2, hl: 1.0, hw: 0.4, cam: 6.5 },
 }
 const VT = SPEC
 const CARCOL = ['#e63946', '#f4a261', '#2a9d8f', '#264653', '#e9c46a', '#8d99ae', '#fb8500', '#6a4c93', '#f1faee']
 const BUSCOL = ['#d62828', '#d62828', '#c1121f'] // BRTC red
 const EZYCOL = ['#1b9e5a', '#1b9e5a', '#16a34a'] // green battery auto
 const BIKECOL = ['#ff7b00', '#ff7b00', '#ff7b00', '#e63946'] // orange dirt bikes
+const SCOOTCOL = ['#ff5d8f', '#4cc9f0', '#f1f1f1', '#8338ec', '#06d6a0']
 const RICKCOL = ['#e63946', '#ffb703', '#06d6a0', '#118ab2', '#ef476f', '#8338ec']
 const NPCCOL = ['#e76f51', '#2a9d8f', '#264653', '#e9c46a', '#8338ec', '#ffffff', '#06d6a0', '#f4a261']
 
@@ -52,12 +60,13 @@ function initWorld() {
         // left-hand traffic
         const off = ax === 'x' ? (dir > 0 ? r - 3.2 : r + 3.2) : dir > 0 ? r + 3.2 : r - 3.2
         const speed = rnd(5, 8.5), ph = Math.random() * 113
-        for (let k = 0; k < 3; k++) {
-          const type = ['rick', 'car', 'ezy', 'rick', 'bus', 'bike', 'rick', 'ezy', 'car', 'rick'][(n + k) % 10]
+        for (let k = 0; k < Q.vehPerLane; k++) {
+          const KINDS = ['rick', 'car', 'ezy', 'rick', 'bus', 'bike', 'taxi', 'ezy', 'van', 'rick', 'scooter', 'car']
+          const type = KINDS[(n + k) % KINDS.length]
           const sp = VT[type]
           G.vehicles.push({
             ax, dir, off, speed, type, s: -255 + ((ph + k * 173) % 510), parked: false, player: false, parkT: 0,
-            color: type === 'bus' ? pick(BUSCOL) : type === 'rick' ? pick(RICKCOL) : type === 'ezy' ? pick(EZYCOL) : type === 'bike' ? pick(BIKECOL) : pick(CARCOL),
+            color: type === 'bus' ? pick(BUSCOL) : type === 'rick' ? pick(RICKCOL) : type === 'ezy' ? pick(EZYCOL) : type === 'bike' ? pick(BIKECOL) : type === 'scooter' ? pick(SCOOTCOL) : type === 'taxi' ? '#f2c200' : type === 'van' ? '#f4f4f0' : pick(CARCOL),
             hx: ax === 'x' ? sp.hl : sp.hw, hz: ax === 'x' ? sp.hw : sp.hl,
             x: 0, z: 0, ry: 0, vx: ax === 'x' ? dir * speed : 0, vz: ax === 'z' ? dir * speed : 0, cd: 0,
           })
@@ -67,8 +76,9 @@ function initWorld() {
     })
   })
   G.vehicles.forEach((v) => placeVeh(v))
+  G.vehicles.forEach((v) => { v.lane = G.vehicles.filter((u) => u.ax === v.ax && u.dir === v.dir && u.off === v.off && !u.player) })
 
-  for (let k = 0; k < 34; k++) {
+  for (let k = 0; k < Q.npcCount; k++) {
     let i, j, side
     do { i = Math.floor(Math.random() * BX.length); j = Math.floor(Math.random() * BX.length); side = Math.floor(Math.random() * 4) }
     while ((side === 0 && i === 0) || (side === 1 && i === BX.length - 1) || (side === 2 && j === 0) || (side === 3 && j === BX.length - 1))
@@ -80,6 +90,33 @@ function initWorld() {
     G.npcs.push({ ax, c, a0, a1, a, dir: Math.random() < 0.5 ? 1 : -1, speed: rnd(1.1, 1.8), scare: 0, color: pick(NPCCOL), x: 0, z: 0, ry: 0, moving: true })
   }
   G.npcs.forEach((p) => placeNpc(p))
+  initPolice()
+}
+
+const VCOL = ['#e9c46a', '#ffffff', '#8ecae6', '#f4a261', '#b5e48c', '#ffb4a2']
+function initPolice() {
+  // traffic police direct junctions; patrol officers walk the footpaths; vendors stand behind the nearest market stalls
+  const J = Q.mobile ? [[0, 0], [80, 80], [0, 80]] : [[0, 0], [80, 0], [0, 80], [80, 80], [-80, 0], [80, -80]]
+  J.forEach(([cx, cz], i) => {
+    const x = cx + (i % 2 ? -11.5 : 11.5), z = cz + 11.5
+    G.officers.push({ kind: 'traffic', st: 'point', x, z, hx: x, hz: z, ry: Math.atan2(cx - x, cz - z), hry: Math.atan2(cx - x, cz - z), t: i * 1.7, react: 0, whistleT: -99 })
+  })
+  for (let k = 0; k < (Q.mobile ? 3 : 6); k++) {
+    let i, j, side
+    do { i = Math.floor(Math.random() * BX.length); j = Math.floor(Math.random() * BX.length); side = Math.floor(Math.random() * 4) }
+    while ((side === 0 && i === 0) || (side === 1 && i === BX.length - 1) || (side === 2 && j === 0) || (side === 3 && j === BX.length - 1))
+    const [x0, x1] = BX[i], [z0, z1] = BX[j]
+    const ax = side < 2 ? 'z' : 'x'
+    const c = [x0 + 2.6, x1 - 2.6, z0 + 2.6, z1 - 2.6][side]
+    const a0 = (ax === 'z' ? z0 : x0) + 4, a1 = (ax === 'z' ? z1 : x1) - 4
+    const o = { kind: 'patrol', st: 'walk', ax, c, a0, a1, a: rnd(a0, a1), dir: Math.random() < 0.5 ? 1 : -1, speed: 1.3, x: 0, z: 0, ry: 0, t: k * 2.3, react: 0, whistleT: -99 }
+    placeNpc(o); G.officers.push(o)
+  }
+  const pad = PADS.find((p) => p.id === 'chanda')
+  stalls.map((s, idx) => ({ s, idx, d: Math.hypot(s.x - pad.x, s.z - pad.z) })).sort((a, b) => a.d - b.d).slice(0, Q.mobile ? 12 : 24).forEach(({ s, idx }) => {
+    const per = s.inward, z = s.ax === 'z'
+    G.vendors.push({ sx: s.x, sz: s.z, x: z ? s.x + per * 1.3 : s.x, z: z ? s.z : s.z + per * 1.3, ry: Math.atan2(z ? -per : 0, z ? 0 : -per), idx, active: false, done: false, scare: 0, color: VCOL[idx % VCOL.length], kind: s.kind })
+  })
 }
 
 function placeVeh(v) {
@@ -94,10 +131,11 @@ initWorld()
 
 // ---------- game flow ----------
 export function resetGame() {
-  Object.assign(G, { x: 40, y: 0.12, z: 46, vx: 0, vz: 0, vy: 0, grounded: true, face: Math.PI, spd: 0, yaw: 0, pitch: 0.38, stun: 0, mode: 'foot', heat: 0, wantedShown: 0, mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null, hp: 100, mob: 0, crowd: [], crowdCd: 0, cng: null, punchT: 0, fx: [], ride: null })
+  Object.assign(G, { x: 40, y: 0.12, z: 46, vx: 0, vz: 0, vy: 0, grounded: true, face: Math.PI, spd: 0, yaw: 0, pitch: 0.38, stun: 0, mode: 'foot', heat: 0, wantedShown: 0, mission: null, cps: [], cpi: 0, cops: [], rivals: [], target: null, hp: 100, mob: 0, crowd: [], crowdCd: 0, cng: null, punchT: 0, fx: [], ride: null, copAlert: 0, bustCd: 0, menuOpen: false })
+  G.officers = G.officers.filter((o) => o.kind !== 'raid'); G.vendors.forEach((v) => { v.active = false; v.done = false })
   G.vehicles.forEach((v) => { if (v.player || v.parked) respawnVeh(v, rnd(-250, 250)) })
   siren(false); crowdLoop(false); engine(null)
-  hud.set({ ride: null, speed: 0, meme: null, hp: 100, mob: 0, news: null, wanted: 0, mission: null, obj: '', left: 0, prompt: '', result: null, toasts: [] })
+  hud.set({ ride: null, speed: 0, meme: null, hp: 100, mob: 0, news: null, wanted: 0, mission: null, obj: '', left: 0, prompt: '', result: null, toasts: [], menu: null, cm: null })
 }
 
 export function startMission(id) {
@@ -121,6 +159,18 @@ export function startMission(id) {
     G.cps = [HIDE]; G.heat = 3; siren(true)
     G.cops = [[80, 40], [40, 80], [80, 80]].map(([x, z]) => ({ x, z, ry: 0, nudge: 0, side: Math.random() < 0.5 ? 1 : -1 }))
   }
+  if (id === 'chanda') {
+    const pad = PADS.find((p) => p.id === 'chanda'), chosen = []
+    G.vendors.forEach((v) => { v.active = false; v.done = false; v.scare = 0 })
+    for (const v of G.vendors.slice().sort((a, b) => Math.hypot(a.sx - pad.x, a.sz - pad.z) - Math.hypot(b.sx - pad.x, b.sz - pad.z))) {
+      if (chosen.every((c) => Math.hypot(c.sx - v.sx, c.sz - v.sz) > 14)) chosen.push(v)
+      if (chosen.length >= 5) break
+    }
+    chosen.forEach((v, i) => { v.active = true; v.ci = i })
+    Object.assign(G.mission, { cash: 0, cm: 0, done: 0, total: chosen.length, alarm: false, escape: 0 })
+    G.cps = chosen.map((v) => [v.sx, v.sz])
+    memeLine('start', true)
+  }
   hud.set({ mission: { id, title: m.title }, left: m.time, obj: '', prompt: '', wanted: id === 'chase' ? 3 : hud.get().wanted })
   toast(m.intro, 'mission')
 }
@@ -132,36 +182,52 @@ function end(ok, msg, xp, chaos) {
   hud.set({ result: { ok, id: m.id, title: MISSIONS[m.id].title, msg, xp: ok ? Math.round(xp) : 10, chaos: ok ? chaos : 0, time: m.t }, mission: null, left: 0, obj: '', wanted: 0, prompt: '' })
   Object.assign(G, { mission: null, cps: [], cops: [], rivals: [], cng: null, mode: G.ride ? 'ride' : 'foot', heat: 0, wantedShown: 0, stun: 0, target: null })
   G.noPauseUntil = performance.now() + 500 // ignore the unlock event this triggers
+  G.officers = G.officers.filter((o) => o.kind !== 'raid'); G.menuOpen = false; G.vendors.forEach((v) => { v.active = false })
+  hud.set({ menu: null, cm: null })
   document.exitPointerLock?.()
 }
 
-function addHeat(h) { G.heat = Math.min(5.99, G.heat + h) }
+function addHeat(h) { G.heat = Math.min(5.99, G.heat + h); if (h >= 0.3) G.copAlert = Math.max(G.copAlert, 5) }
 
 // ---------- step ----------
 export function step(dt) {
   const st = hud.get()
   if (st.phase !== 'play' || st.result) return
   dt = Math.min(dt, 0.05)
-  G.t += dt
-  vehicles(dt); npcs(dt); player(dt); crowd(dt); mission(dt); wanted(dt); syncMeters()
+  G.t += dt; SIG.t += dt
+  vehicles(dt); npcs(dt); player(dt); officers(dt); crowd(dt); mission(dt); wanted(dt); syncMeters()
   G.jump = false; G.interact = false; G.punch = false; G.horn = false
 }
 
 function vehicles(dt) {
   for (const v of G.vehicles) {
-    if (v.player) continue
-    if (v.parked) { // left behind by the player: a roadblock for a while, then back into circulation
+    if (v.player) { v.braking = false; continue }
+    if (v.parked) { v.braking = false // left behind by the player: a roadblock for a while, then back into circulation
       v.cd -= dt; v.parkT += dt
       if (v.parkT > 40 && Math.hypot(v.x - G.x, v.z - G.z) > 70) respawnVeh(v, v.dir > 0 ? -255 : 255)
       continue
     }
     if (v.halt > 0) { v.halt -= dt; v.cd -= dt; continue } // punched: stuck in a jam
+    v.braking = stopHere(v)
+    if (v.braking) { v.cd -= dt; continue }
     v.s += v.dir * v.speed * dt
     if (v.s > 258) v.s -= 516
     else if (v.s < -258) v.s += 516
     v.cd -= dt
     placeVeh(v)
   }
+}
+
+// obey junction signals and queue politely behind a stopped leader (brake lights come on while v.braking)
+function stopHere(v) {
+  const sg = signalState(v.ax)
+  if (sg !== 'g') for (const c of ROADS) { const d = (c - v.s) * v.dir; if (d > 8.4 && d < 8.4 + v.speed * 0.12 + 0.6) return true }
+  for (const u of v.lane) {
+    if (u === v || !u.braking) continue
+    const gap = (((u.s - v.s) * v.dir) % 516 + 516) % 516
+    if (gap < VT[u.type].hl + VT[v.type].hl + 1.6) return true
+  }
+  return false
 }
 
 function npcs(dt) {
@@ -192,6 +258,7 @@ function player(dt) {
   const jx = Math.abs(G.joy.x) > 0.15 ? G.joy.x : 0, jy = Math.abs(G.joy.y) > 0.15 ? G.joy.y : 0
   ix = Math.max(-1, Math.min(1, ix + jx)); iz = Math.max(-1, Math.min(1, iz + jy))
   if (G.stun > 0) { G.stun -= dt; ix = iz = 0 }
+  if (G.menuOpen) { ix = iz = 0; G.vx = G.vz = 0 }
   if (G.mission && G.mission.cd > 0) ix = iz = 0
   const s = Math.sin(G.yaw), c = Math.cos(G.yaw)
   let dx = ix * c - iz * s, dz = -ix * s - iz * c
@@ -331,6 +398,7 @@ function drive(dt) {
   if (thr > 0) r.sp += (r.sp < 0 ? sp.acc * 2.5 : sp.acc * (boost ? 1.6 : 1)) * thr * dt
   else if (thr < 0) r.sp -= (r.sp > 0.5 ? sp.acc * 2 : sp.acc * 0.6) * -thr * dt
   else r.sp -= Math.sign(r.sp) * Math.min(Math.abs(r.sp), 4 * dt)
+  r.braking = brake || thr < 0
   if (brake) r.sp -= Math.sign(r.sp) * Math.min(Math.abs(r.sp), 28 * dt)
   r.sp = clamp(r.sp, sp.rev, maxV)
 
@@ -409,13 +477,18 @@ function interact() {
   if (!G.mission) pad = PADS.find((p) => Math.hypot(G.x - p.x, G.z - p.z) < 3.4)
   if (!ride) { car = nearVehicle(); npc = G.npcs.find((p) => Math.hypot(G.x - p.x, G.z - p.z) < 3.5) }
   let prompt = ''
-  if (pad) prompt = `E চাপুন — ${pad.label} শুরু করো`
+  const vend = G.mission?.id === 'chanda' && !G.mission.alarm && !ride && !G.menuOpen ? G.vendors.find((v) => v.active && !v.done && Math.hypot(G.x - v.sx, G.z - v.sz) < 3.9) : null
+  if (vend) prompt = 'E চাপুন / ট্যাপ — বিক্রেতার সাথে কথা বলো'
+  else if (G.menuOpen) prompt = ''
+  else if (pad) prompt = `E চাপুন — ${pad.label} শুরু করো`
   else if (ride) prompt = 'E চাপুন — গাড়ি থেকে নামো · H হর্ন'
   else if (car) prompt = `E চাপুন — ${SPEC[car.type].label} চালাও`
   else if (npc && G.mode === 'foot') prompt = 'E চাপুন — জোরে ধমক দাও!'
   if (prompt !== hud.get().prompt) hud.set({ prompt })
   if (G.interact) {
-    if (pad) startMission(pad.id)
+    if (vend) openChanda(vend)
+    else if (G.menuOpen) { /* menu handles input */ }
+    else if (pad) startMission(pad.id)
     else if (ride) leaveRide()
     else if (car) enterRide(car)
     else if (npc && G.mode === 'foot' && G.cdNpc <= 0) {
@@ -473,6 +546,9 @@ function mission(dt) {
   } else if (m.id === 'cng') {
     obj = `অটো ধরো! আর ${bn(G.cng.hp)}টি ঘুষি বাকি`
     cngStep(dt)
+  } else if (m.id === 'chanda') {
+    chandaStep(m, dt); if (!G.mission) return
+    obj = m.alarm ? `পুলিশ আসছে! পালাও — ${bn(Math.ceil(Math.max(0, m.escape)))} সে.` : `বিক্রেতা ${bn(m.done)}/${bn(m.total)} · ${taka(m.cash)}`
   } else if (m.id === 'chase') {
     G.heat = Math.max(G.heat, 3)
     obj = 'পুলিশ থেকে পালিয়ে গোপন আড্ডায় পৌঁছাও!'
@@ -482,8 +558,100 @@ function mission(dt) {
   }
   if (obj !== hud.get().obj) hud.set({ obj })
   if (m.left <= 0) {
-    const msgs = { boss: 'সময় শেষ! জ্যামে আটকাইলা নাকি?', race: 'রিকশা পিছনে পইড়া গেল! সময় শেষ!', chase: 'সময় শেষ! পুলিশ মামারা আড্ডায় ঘেরাও করছে!', cng: 'অটো পালাইছে! এখন মিটারের ভাড়াই দিতে হবে!' }
+    const msgs = { boss: 'সময় শেষ! জ্যামে আটকাইলা নাকি?', race: 'রিকশা পিছনে পইড়া গেল! সময় শেষ!', chase: 'সময় শেষ! পুলিশ মামারা আড্ডায় ঘেরাও করছে!', cng: 'অটো পালাইছে! এখন মিটারের ভাড়াই দিতে হবে!', chanda: 'সময় শেষ! বিক্রেতারা সব দোকান গুটিয়ে পালাইছে!' }
     end(false, msgs[m.id], 0, 0)
+  }
+}
+
+// ================= police officers (humans) =================
+const COP_WARN = LINES.cop
+function officers(dt) {
+  G.copAlert = Math.max(0, G.copAlert - dt); G.bustCd -= dt
+  const alert = G.heat >= 1 || G.copAlert > 0, reach = G.heat >= 3 ? 55 : 32
+  for (const o of G.officers) {
+    o.t += dt
+    const dx = G.x - o.x, dz = G.z - o.z, d = Math.hypot(dx, dz) || 1
+    if (o.react > 0) { o.react -= dt; o.st = 'cheer'; continue }
+    const hunt = o.kind === 'raid' || (alert && d < reach && G.bustCd <= 0)
+    if (hunt) {
+      if (o.st !== 'run' && d < 45 && G.t - (G.lastShout || -99) > 5) { G.lastShout = G.t; memeLine('siren'); sfx('whistle') }
+      o.st = 'run'
+      const sp = o.kind === 'raid' ? 5.2 : 4.4 + Math.min(G.heat, 4) * 0.35
+      o.x += (dx / d) * sp * dt; o.z += (dz / d) * sp * dt
+      for (const q of G.officers) if (q !== o) { const ex = o.x - q.x, ez = o.z - q.z, ed = Math.hypot(ex, ez); if (ed < 1.0 && ed > 0.01) { o.x += (ex / ed) * (1 - ed) * 0.5; o.z += (ez / ed) * (1 - ed) * 0.5 } }
+      resolve(o, 0.5)
+      o.ry = angLerp(o.ry, Math.atan2(dx, dz), 1 - Math.exp(-10 * dt))
+      if (d < 1.9 && (!G.ride || Math.abs(G.ride.sp) < 3)) caught(o)
+      if (!G.mission && G.heat < 1 && !G.copAlert) o.st = 'walk'
+      continue
+    }
+    if (o.kind === 'traffic') {
+      const hd = Math.hypot(o.hx - o.x, o.hz - o.z)
+      if (hd > 0.6) { o.st = 'walk'; o.x += ((o.hx - o.x) / hd) * 2.6 * dt; o.z += ((o.hz - o.z) / hd) * 2.6 * dt; o.ry = angLerp(o.ry, Math.atan2(o.hx - o.x, o.hz - o.z), 1 - Math.exp(-8 * dt)) }
+      else { o.st = Math.floor(o.t / 4) % 2 ? 'stand' : 'point'; o.ry = angLerp(o.ry, o.hry, 1 - Math.exp(-6 * dt)) }
+    } else {
+      o.a += o.dir * o.speed * dt
+      if (o.a > o.a1) { o.a = o.a1; o.dir = -1 } else if (o.a < o.a0) { o.a = o.a0; o.dir = 1 }
+      const t = { ax: o.ax, c: o.c, a: o.a, dir: o.dir }; placeNpc(t)
+      const k = Math.min(1, 3 * dt); o.x += (t.x - o.x) * k; o.z += (t.z - o.z) * k; o.ry = angLerp(o.ry, t.ry, 0.2); o.st = 'walk'
+    }
+    if (G.heat > 0.3 && d < 12 && G.t - o.whistleT > 10) { o.whistleT = G.t; sfx('whistle'); fx(pick(COP_WARN), o.x, 2.7, o.z, '#7db8ff') }
+  }
+}
+
+function caught(o) {
+  const id = G.mission?.id
+  if (id === 'chase') return end(false, 'ধরা খাইলা! থানায় চলো, চা-বিস্কুট দিমু!', 0, 0)
+  if (id === 'chanda' && G.mission.alarm) return end(false, 'পুলিশ ধরছে! সব ভার্চুয়াল চাঁদা বাজেয়াপ্ত!', 0, 0)
+  if (G.bustCd > 0) return
+  G.bustCd = 10; G.heat = 0; G.copAlert = 0; G.stun = 1.4
+  const lose = Math.min(hud.get().chaos, 40)
+  hud.set({ chaos: hud.get().chaos - lose }); saveNow()
+  toast(`পুলিশ ধরেছে! জরিমানা −${bn(lose)} চাওস (ভার্চুয়াল)`, 'bad'); memeLine('busted', true)
+  G.officers.forEach((q) => { if (q.kind !== 'raid') q.react = 2.2 })
+}
+
+// ================= footpath chanda mission (all virtual money, comedy only) =================
+function openChanda(v) {
+  G.menuOpen = true; G.vx = G.vz = 0
+  G.noPauseUntil = performance.now() + 1500
+  document.exitPointerLock?.()
+  hud.set({ menu: { v: G.vendors.indexOf(v), line: pick(LINES.vendor), shop: ['ফলের দোকান', 'চা-পান-সিগারেট', 'জামা-কাপড়', 'ঝালমুড়ি · ফুচকা', 'সবজি বাজার'][v.kind] || 'দোকান' } })
+}
+export function chandaChoose(k) {
+  const m = G.mission, menu = hud.get().menu
+  if (!m || m.id !== 'chanda' || !menu) return
+  const v = G.vendors[menu.v]
+  G.menuOpen = false; hud.set({ menu: null })
+  if (k < 0) return
+  v.done = true; m.done++; v.scare = 2.5
+  if (k === 0) { m.cash += 500; m.cm += 12; addChaos(15, '৳৫০০ চাঁদা — ভার্চুয়াল!'); sfx('cash'); memeLine('take', true) }
+  else if (k === 1) {
+    if (Math.random() < 0.55) { m.cash += 1000; m.cm += 28; addChaos(30, '৳১,০০০! বিক্রেতা কাঁদো কাঁদো!'); sfx('cash'); memeLine('more', true) }
+    else { m.cm += 18; addHeat(0.5); toast('বিক্রেতা চিল্লাচিল্লি করে দোকান গুটাইছে — কিছুই পাইলা না!', 'bad'); sfx('scratch'); memeLine('more', true) }
+  } else if (k === 2) { m.cm = Math.max(0, m.cm - 8); addXp(25); toast('ছেড়ে দিলে — ভালো মানুষ! +২৫ XP', 'chaos'); memeLine('spare', true) }
+  else { m.cash += 300; m.cm += 24; addHeat(0.6); addChaos(20, 'ধমক দিয়ে ৳৩০০!'); memeLine('threat', true) }
+  fx(['+৳৫০০', '+৳১,০০০ / ✗', 'ধন্যবাদ!', '+৳৩০০'][k], v.x, 2.6, v.z, '#ffd23f')
+  hud.set({ cm: { cash: m.cash, pct: Math.min(100, Math.round(m.cm)) } })
+}
+function chandaStep(m, dt) {
+  if (hud.get().cm?.cash !== m.cash || hud.get().cm?.pct !== Math.min(100, Math.round(m.cm))) hud.set({ cm: { cash: m.cash, pct: Math.min(100, Math.round(m.cm)) } })
+  for (const v of G.vendors) if (v.scare > 0) v.scare -= dt
+  if (!m.alarm) {
+    let best = -1, bd = 1e9
+    G.vendors.forEach((v) => { if (v.active && !v.done) { const d = Math.hypot(G.x - v.sx, G.z - v.sz); if (d < bd) { bd = d; best = v.ci } } })
+    if (best >= 0) G.cpi = best
+    if (m.cm >= 100) { // cartoon police raid
+      m.alarm = true; m.escape = 22; G.menuOpen = false; hud.set({ menu: null })
+      for (let i = 0; i < 3; i++) { const a = G.face + Math.PI + (i - 1) * 0.75, o = { kind: 'raid', st: 'run', x: G.x + Math.sin(a) * 30, z: G.z + Math.cos(a) * 30, ry: 0, t: 0, react: 0, whistleT: 0 }; resolve(o, 0.6); G.officers.push(o) }
+      G.heat = Math.max(G.heat, 3.2); siren(true); G.cps = [HIDE]; G.cpi = 0
+      news('ব্রেকিং: ফুটপাতে হুলস্থুল! পুলিশ ছুটছে', 'ভার্চুয়াল চাঁদাবাজ যুবককে ধরতে মাঠে ৩ পুলিশ মামা', true); memeLine('siren', true)
+      return
+    }
+    if (best < 0) end(true, m.done && m.cash >= 1500 ? 'চাঁদা কিং! বাজারে তোমার নামে সবাই ভয় পায়!' : 'সব দোকান ঘুরে ফেললে — এইবার চা খাও!', 120 + m.cash * 0.12 + Math.max(0, m.left) * 2, 60 + Math.round(m.cash / 25))
+  } else {
+    m.escape -= dt
+    if (Math.hypot(G.x - HIDE[0], G.z - HIDE[1]) < 5 || m.escape <= 0) { memeLine('copgone', true); end(true, 'পুলিশ মামা ফেল! পালাইছো ভার্চুয়াল টাকা নিয়ে!', 80 + m.cash * 0.05, 40) }
   }
 }
 

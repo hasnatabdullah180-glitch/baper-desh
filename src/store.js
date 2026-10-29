@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { sfx, say, isMuted, setMuted } from './audio'
+import { sfx, say, isMuted, setMuted, getAudio, setAudio } from './audio'
 import { LINES, MEME_SFX } from './lines'
 
 const KEY = 'baperdesh.save.v1'
@@ -30,6 +30,9 @@ let s = {
   meme: null,
   ride: null,
   speed: 0,
+  aud: getAudio(),
+  menu: null, // chanda vendor menu
+  cm: null, // chanda meter {cash,pct}
 }
 
 export const hud = {
@@ -73,6 +76,7 @@ export function recordBest(id, t) {
   if (!cur || t < cur) { hud.set({ best: { ...s.best, [id]: Math.round(t * 10) / 10 } }); saveNow() }
 }
 
+export function setAudioPref(p) { setAudio(p); hud.set({ aud: getAudio() }) }
 export function toggleMute() { const m = !s.muted; setMuted(m); hud.set({ muted: m }) }
 
 // ৳ with Bangladeshi digit grouping, e.g. ৳১,২৫,০০০

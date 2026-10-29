@@ -29,7 +29,7 @@ function Pad({ p }) {
   )
 }
 
-const BC = { boss: ['#f42a41', 5], race: ['#ffb703', 9], chase: ['#06d6a0', 5], cng: ['#ff7b00', 3.2] }
+const BC = { boss: ['#f42a41', 5], race: ['#ffb703', 9], chase: ['#06d6a0', 5], cng: ['#ff7b00', 3.2], chanda: ['#14b8a6', 3.4] }
 const ringMats = {}, beamMats = {}
 const gm = (cache, c, o) => (cache[c + o] ||= glow(c, o))
 

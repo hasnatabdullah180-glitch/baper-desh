@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { G } from './sim'
-import { rects, ROADS, RW } from './world'
+import { rects, ROADS, RW, PADS } from './world'
 import { hud } from './store'
 
 const S = 150, R = 62, K = S / 2 / R // canvas px, world radius, px per unit
@@ -34,6 +34,10 @@ export default function Minimap() {
         g.beginPath(); g.moveTo(...p1); g.lineTo(...p2); g.lineTo(...p3); g.lineTo(...p4); g.closePath(); g.fill()
       }
       const dot = (x, z, col, r = 4) => { const [px, py] = P(x, z); g.fillStyle = col; g.beginPath(); g.arc(px, py, r, 0, 7); g.fill() }
+      const sq = (x, z, col) => { const [px, py] = P(x, z); g.fillStyle = col; g.fillRect(px - 3.5, py - 3.5, 7, 7) }
+      if (!G.mission) PADS.forEach((p) => sq(p.x, p.z, p.color))
+      if (G.mission?.id === 'chanda') G.vendors.forEach((v) => { if (v.active && !v.done) dot(v.sx, v.sz, '#14b8a6', 4.5) })
+      G.officers.forEach((o) => { const hot = o.st === 'run'; dot(o.x, o.z, hot ? '#ff3b4d' : '#4d8dff', hot ? 4 : 3) }) // police: blue on duty, red when chasing
       G.cops.forEach((c2) => dot(c2.x, c2.z, '#ff3b4d'))
       G.rivals.forEach((r) => dot(r.x, r.z, r.color))
       if (G.target) { // clamp objective to the rim so it is always findable

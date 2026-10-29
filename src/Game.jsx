@@ -5,8 +5,10 @@ import City from './City.jsx'
 import { Traffic, Npcs } from './Traffic.jsx'
 import { Player, CameraRig } from './Player.jsx'
 import Missions from './Missions.jsx'
+import { Officers, Vendors } from './Police.jsx'
 import { G, step } from './sim'
 import { hud } from './store'
+import { Q } from './quality'
 
 function Sun({ shadows }) {
   const l = useRef()
@@ -22,7 +24,7 @@ function Sun({ shadows }) {
     l.current.target.updateMatrixWorld()
   })
   return (
-    <directionalLight ref={l} intensity={2.3} color="#fff0d2" castShadow={shadows} shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004}
+    <directionalLight ref={l} intensity={2.3} color="#fff0d2" castShadow={shadows} shadow-mapSize={Q.mobile ? [512, 512] : [1024, 1024]} shadow-bias={-0.0004}
       shadow-camera-left={-40} shadow-camera-right={40} shadow-camera-top={40} shadow-camera-bottom={-40} shadow-camera-near={1} shadow-camera-far={160} />
   )
 }
@@ -49,6 +51,8 @@ function Scene({ shadows }) {
       <City />
       <Traffic />
       <Npcs />
+      <Officers />
+      <Vendors />
       <Missions />
       <Player />
       <Sim />
@@ -60,8 +64,8 @@ function Scene({ shadows }) {
 
 export default function Game() {
   const [fonts, setFonts] = useState(false)
-  const [dpr, setDpr] = useState(() => (window.matchMedia?.('(pointer: coarse)').matches ? 0.9 : 1.25))
-  const [shadows, setShadows] = useState(true)
+  const [dpr, setDpr] = useState(() => (Q.mobile ? Math.min(0.9, Q.dprMax) : 1.25))
+  const [shadows, setShadows] = useState(Q.shadows)
   useEffect(() => {
     let on = true
     const done = () => on && setFonts(true)
@@ -70,10 +74,10 @@ export default function Game() {
     return () => { on = false }
   }, [])
   return (
-    <Canvas shadows="percentage" dpr={dpr} camera={{ fov: 62, near: 0.1, far: 700, position: [40, 6, 56] }} gl={{ antialias: true, powerPreference: 'high-performance' }}>
+    <Canvas shadows={shadows ? 'percentage' : false} dpr={dpr} camera={{ fov: 62, near: 0.1, far: 700, position: [40, 6, 56] }} gl={{ antialias: !Q.mobile, powerPreference: 'high-performance' }}>
       <PerformanceMonitor ms={250} iterations={8} flipflops={3}
-        onChange={({ factor }) => setDpr(Math.round((0.7 + 0.8 * factor) * 20) / 20)}
-        onFallback={() => { setDpr(0.7); setShadows(false) }} />
+        onChange={({ factor }) => setDpr(Math.min(Q.dprMax, Math.round((0.7 + 0.8 * factor) * 20) / 20))}
+        onFallback={() => { setDpr(0.7); setShadows(false); Q.levelDown() }} />
       {fonts && <Suspense fallback={null}><Scene shadows={shadows} /></Suspense>}
     </Canvas>
   )

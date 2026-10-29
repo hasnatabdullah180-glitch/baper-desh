@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { G, resetGame } from './sim'
+import { G, resetGame, chandaChoose } from './sim'
 import { hud, toggleMute } from './store'
-import { initAudio, setActive, siren } from './audio'
+import { initAudio, setActive, siren, sfx } from './audio'
 
 export function lock() {
   const c = document.querySelector('canvas:not(.minimap)')
@@ -26,6 +26,7 @@ export function startGame() { resetGame(); initAudio(); setActive(true); goFulls
 export function pauseGame() { if (hud.get().phase !== 'play') return; hud.set({ phase: 'pause' }); setActive(false); document.exitPointerLock?.() }
 export function resumeGame() { initAudio(); setActive(true); hud.set({ phase: 'play' }); lock() }
 export function toMenu() { resetGame(); setActive(false); siren(false); hud.set({ phase: 'menu' }); document.exitPointerLock?.() }
+export function chooseChanda(k) { chandaChoose(k); sfx('chandaOpen'); lock() }
 export function dismissResult() { hud.set({ result: null }); lock() }
 
 export function useInput() {
@@ -36,6 +37,7 @@ export function useInput() {
       G.keys[e.code] = true
       if (e.repeat) return
       if (e.code === 'KeyM') toggleMute()
+      if (st.menu) { const k = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Escape: -1, KeyE: -1 }[e.code]; if (k !== undefined) { chooseChanda(k); return } }
       if (st.phase === 'play' && !st.result) {
         if (e.code === 'Space') G.jump = true
         if (e.code === 'KeyE') G.interact = true
@@ -62,7 +64,7 @@ export function useInput() {
     }
     const plc = () => {
       const st = hud.get()
-      if (!document.pointerLockElement && st.phase === 'play' && !st.result && !G.noLock && performance.now() > (G.noPauseUntil || 0)) pauseGame()
+      if (!document.pointerLockElement && st.phase === 'play' && !st.result && !st.menu && !G.menuOpen && !G.noLock && performance.now() > (G.noPauseUntil || 0)) pauseGame()
     }
     const plerr = () => { G.noLock = true }
     const blur = () => { G.keys = {}; pauseGame() }
